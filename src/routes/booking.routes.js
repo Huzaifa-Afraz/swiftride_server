@@ -83,4 +83,24 @@ router.patch(
   bookingController.updateBookingStatus
 );
 
+
+router.patch(
+  "/extend/:bookingId",
+  authenticate,
+  authorizeRoles("customer"),
+  requireKycApproved,
+  bookingController.extendBooking
+);
+
+
+router.get(
+  "/invoice/:bookingId",
+  authenticate,
+  authorizeRoles("customer", "host", "showroom", "admin"),
+  bookingController.downloadInvoice
+);
+
+
+
+
 export default router;

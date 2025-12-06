@@ -5,16 +5,27 @@ const fromAddress =
 const adminEmail =
   process.env.ADMIN_NOTIFICATION_EMAIL || "huzaifaafraz90@gmail.com";
 
-export const sendEmail = async ({ to, subject, html }) => {
+// export const sendEmail = async ({ to, subject, html }) => {
+//   const mailOptions = {
+//     from: fromAddress,
+//     to,
+//     subject,
+//     html
+//   };
+export const sendEmail = async ({ to, subject, html, attachments }) => {
   const mailOptions = {
     from: fromAddress,
     to,
     subject,
-    html
+    html,
+    attachments // can be undefined
   };
 
   await transporter.sendMail(mailOptions);
 };
+
+
+
 
 /**
  * ADMIN NOTIFICATION – new registration
@@ -152,4 +163,48 @@ export const sendPasswordResetEmail = async (user, token) => {
   `;
 
   await sendEmail({ to: user.email, subject, html });
+};
+
+
+
+export const sendBookingInvoiceEmail = async (
+  customer,
+  booking,
+  pdfPath
+) => {
+  if (!customer?.email) return;
+
+  const subject = `Your SwiftRide booking invoice – ${booking.invoiceNumber}`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; color:#222;">
+      <h2>SwiftRide Booking Confirmed</h2>
+      <p>Dear ${customer.fullName || "customer"},</p>
+      <p>Your booking has been <strong>confirmed</strong>. Please find your invoice attached as a PDF.</p>
+      <p>
+        <strong>Invoice #:</strong> ${booking.invoiceNumber}<br/>
+        <strong>Booking ID:</strong> ${booking._id}<br/>
+        <strong>Total:</strong> ${booking.currency} ${booking.totalPrice.toFixed(0)}
+      </p>
+      <p style="margin-top:16px;">
+        Please bring your original documents at the time of vehicle handover.
+      </p>
+      <p style="margin-top:24px;">
+        Regards,<br/>
+        <strong>SwiftRide Team</strong>
+      </p>
+    </div>
+  `;
+
+  await sendEmail({
+    to: customer.email,
+    subject,
+    html,
+    attachments: [
+      {
+        filename: `${booking.invoiceNumber}.pdf`,
+        path: pdfPath
+      }
+    ]
+  });
 };

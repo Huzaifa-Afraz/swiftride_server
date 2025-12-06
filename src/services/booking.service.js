@@ -7,6 +7,18 @@ import ApiError from "../utils/ApiError.js";
 import { Booking } from "../models/booking.model.js";
 import { Car } from "../models/car.model.js";
 import { User, USER_ROLE } from "../models/user.model.js";
+import { generateInvoicePDF } from "./invoice.service.js";
+import { sendBookingInvoiceEmail } from "../utils/email.js";
+
+const pushStatusHistory = (booking, status, changedBy, note) => {
+  booking.statusHistory.push({
+    status,
+    changedAt: new Date(),
+    changedBy,
+    note
+  });
+};
+
 
 
 const calculateDays = (start, end) => {
@@ -75,81 +87,145 @@ const calculateDays = (start, end) => {
 // };
 
 
+// export const createBooking = async (customerId, payload) => {
+//   const { carId, startDate, endDate } = payload;
+
+//   const customer = await User.findById(customerId);
+//   if (!customer) {
+//     throw new ApiError(httpStatus.NOT_FOUND, "Customer not found");
+//   }
+
+//   if (customer.role !== USER_ROLE.CUSTOMER) {
+//     throw new ApiError(
+//       httpStatus.FORBIDDEN,
+//       "Only customers can create bookings"
+//     );
+//   }
+
+//   if (!customer.isKycApproved) {
+//     throw new ApiError(
+//       httpStatus.FORBIDDEN,
+//       "Your KYC must be approved to book a car"
+//     );
+//   }
+
+//   const car = await Car.findById(carId);
+//   if (!car) {
+//     throw new ApiError(httpStatus.NOT_FOUND, "Car not found");
+//   }
+
+//   // Cannot book own car
+//   if (car.owner.toString() === customerId.toString()) {
+//     throw new ApiError(
+//       httpStatus.BAD_REQUEST,
+//       "You cannot book your own car"
+//     );
+//   }
+
+//   const sDate = new Date(startDate);
+//   const eDate = new Date(endDate);
+
+//   if (isNaN(sDate) || isNaN(eDate) || sDate >= eDate) {
+//     throw new ApiError(
+//       httpStatus.BAD_REQUEST,
+//       "Invalid booking dates provided"
+//     );
+//   }
+
+//   // Overlap check – car already booked in this range (pending/confirmed)
+//   const overlapping = await Booking.findOne({
+//     car: carId,
+//     status: { $in: ["pending", "confirmed"] },
+//     $or: [
+//       {
+//         startDate: { $lte: eDate },
+//         endDate: { $gte: sDate }
+//       }
+//     ]
+//   });
+
+//   if (overlapping) {
+//     throw new ApiError(
+//       httpStatus.BAD_REQUEST,
+//       "Car is already booked in the selected dates"
+//     );
+//   }
+
+//   const booking = await Booking.create({
+//     car: carId,
+//     customer: customerId,
+//     owner: car.owner, // convenience
+//     startDate: sDate,
+//     endDate: eDate,
+//     status: "pending"
+//   });
+
+//   return booking;
+// };
+
 export const createBooking = async (customerId, payload) => {
-  const { carId, startDate, endDate } = payload;
-
-  const customer = await User.findById(customerId);
-  if (!customer) {
-    throw new ApiError(httpStatus.NOT_FOUND, "Customer not found");
-  }
-
-  if (customer.role !== USER_ROLE.CUSTOMER) {
-    throw new ApiError(
-      httpStatus.FORBIDDEN,
-      "Only customers can create bookings"
-    );
-  }
-
-  if (!customer.isKycApproved) {
-    throw new ApiError(
-      httpStatus.FORBIDDEN,
-      "Your KYC must be approved to book a car"
-    );
-  }
+  const { carId, startDateTime, endDateTime } = payload;
 
   const car = await Car.findById(carId);
-  if (!car) {
-    throw new ApiError(httpStatus.NOT_FOUND, "Car not found");
-  }
+  if (!car) throw new ApiError(httpStatus.NOT_FOUND, "Car not found");
 
-  // Cannot book own car
-  if (car.owner.toString() === customerId.toString()) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "You cannot book your own car"
-    );
-  }
+  const customer = await User.findById(customerId);
+  if (!customer || customer.role !== USER_ROLE.CUSTOMER)
+    throw new ApiError(httpStatus.BAD_REQUEST, "Only customers can book cars");
 
-  const sDate = new Date(startDate);
-  const eDate = new Date(endDate);
+  if (!customer.isKycApproved)
+    throw new ApiError(httpStatus.FORBIDDEN, "KYC must be approved");
 
-  if (isNaN(sDate) || isNaN(eDate) || sDate >= eDate) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Invalid booking dates provided"
-    );
-  }
+  // self booking check
+  if (car.owner.toString() === customerId)
+    throw new ApiError(httpStatus.BAD_REQUEST, "You cannot book your own car");
 
-  // Overlap check – car already booked in this range (pending/confirmed)
+  const start = new Date(startDateTime);
+  const end = new Date(endDateTime);
+
+  if (start >= end)
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid booking dates");
+
+  // overlap
   const overlapping = await Booking.findOne({
     car: carId,
-    status: { $in: ["pending", "confirmed"] },
-    $or: [
-      {
-        startDate: { $lte: eDate },
-        endDate: { $gte: sDate }
-      }
-    ]
+    status: { $in: ["pending", "confirmed", "ongoing"] },
+    $or: [{ startDateTime: { $lte: end }, endDateTime: { $gte: start } }]
   });
 
-  if (overlapping) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Car is already booked in the selected dates"
-    );
-  }
+  if (overlapping)
+    throw new ApiError(httpStatus.BAD_REQUEST, "Car is already booked");
+
+  const hourlyRate = car.dailyPrice / 24;
+  const durationHours = Math.ceil(Math.abs(end - start) / 36e5);
+  const totalPrice = hourlyRate * durationHours;
+
+  const invoiceNumber = `INV-${Date.now()}-${Math.floor(
+    Math.random() * 9999
+  )}`;
 
   const booking = await Booking.create({
     car: carId,
-    customer: customerId,
-    owner: car.owner, // convenience
-    startDate: sDate,
-    endDate: eDate,
+    customer,
+    owner: car.owner,
+    startDateTime: start,
+    endDateTime: end,
+    durationHours,
+    totalPrice,
+    invoiceNumber,
     status: "pending"
   });
 
-  return booking;
+  booking.statusHistory.push({
+  status: "pending",
+  changedAt: new Date(),
+  changedBy: customerId
+});
+await booking.save();
+return booking;
 };
+
+
 
 export const getCustomerBookings = async (customerId) => {
   return Booking.find({ customer: customerId })
@@ -185,31 +261,211 @@ export const getOwnerBookings = async (ownerId) => {
 
 
 
-export const updateBookingStatus = async (bookingId, ownerId, newStatus) => {
-  const booking = await Booking.findById(bookingId).populate("customer");
+// export const updateBookingStatus = async (bookingId, ownerId, newStatus) => {
+//   const booking = await Booking.findById(bookingId).populate("customer");
+//   if (!booking) {
+//     throw new ApiError(httpStatus.NOT_FOUND, "Booking not found");
+//   }
+
+//   if (booking.owner.toString() !== ownerId.toString()) {
+//     throw new ApiError(
+//       httpStatus.FORBIDDEN,
+//       "You are not allowed to modify this booking"
+//     );
+//   }
+
+//   // When confirming, ensure customer has approved KYC
+//   // if (newStatus === "confirmed") {
+//   //   if (!booking.customer?.isKycApproved) {
+//   //     throw new ApiError(
+//   //       httpStatus.FORBIDDEN,
+//   //       "Customer KYC is not approved. You cannot confirm this booking."
+//   //     );
+//   //   }
+//   // }
+// if (newStatus === "confirmed") {
+//   const pdfPath = generateInvoicePDF(booking, car, customer);
+//   booking.pdfPath = pdfPath;
+//   await booking.save();
+// }
+
+
+
+//   booking.status = newStatus;
+//   await booking.save();
+
+//   return booking;
+// };
+export const updateBookingStatus = async (
+  bookingId,
+  ownerId,
+  newStatus,
+  note
+) => {
+  const booking = await Booking.findById(bookingId)
+    .populate("customer")
+    .populate("car")
+    .populate("owner");
+
   if (!booking) {
     throw new ApiError(httpStatus.NOT_FOUND, "Booking not found");
   }
 
-  if (booking.owner.toString() !== ownerId.toString()) {
+  if (booking.owner._id.toString() !== ownerId.toString()) {
     throw new ApiError(
       httpStatus.FORBIDDEN,
       "You are not allowed to modify this booking"
     );
   }
 
-  // When confirming, ensure customer has approved KYC
+  const allowedStatuses = ["pending", "confirmed", "ongoing", "completed", "cancelled"];
+  if (!allowedStatuses.includes(newStatus)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid status");
+  }
+
+  // Simple workflow rules
+  const current = booking.status;
+  if (current === "completed" || current === "cancelled") {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Cannot change status of a completed/cancelled booking"
+    );
+  }
+
   if (newStatus === "confirmed") {
-    if (!booking.customer?.isKycApproved) {
+    if (!booking.customer.isKycApproved) {
       throw new ApiError(
         httpStatus.FORBIDDEN,
-        "Customer KYC is not approved. You cannot confirm this booking."
+        "Customer KYC is not approved. Cannot confirm booking."
       );
     }
   }
 
   booking.status = newStatus;
-  await booking.save();
+  pushStatusHistory(booking, newStatus, ownerId, note);
 
+  // On confirm – generate invoice + email
+  if (newStatus === "confirmed") {
+    const pdfPath = generateInvoicePDF(
+      booking,
+      booking.car,
+      booking.customer,
+      booking.owner
+    );
+    booking.pdfPath = pdfPath;
+
+    // fire-and-forget email
+    (async () => {
+      try {
+        await sendBookingInvoiceEmail(
+          booking.customer,
+          booking,
+          pdfPath
+        );
+      } catch (err) {
+        console.error("Error sending invoice email:", err.message);
+      }
+    })();
+  }
+
+  await booking.save();
   return booking;
 };
+
+
+
+
+// export const extendBooking = async (bookingId, customerId, newEndTime) => {
+//   const booking = await Booking.findById(bookingId).populate("car");
+
+//   if (!booking) throw new ApiError(httpStatus.NOT_FOUND, "Booking not found");
+
+//   if (booking.customer.toString() !== customerId)
+//     throw new ApiError(
+//       httpStatus.FORBIDDEN,
+//       "Only the customer can extend their booking"
+//     );
+
+//   if (booking.status !== "ongoing" && booking.status !== "confirmed")
+//     throw new ApiError(
+//       httpStatus.BAD_REQUEST,
+//       "Booking must be active to extend"
+//     );
+
+//   const oldEnd = booking.endDateTime;
+//   const newEnd = new Date(newEndTime);
+
+//   if (newEnd <= oldEnd)
+//     throw new ApiError(
+//       httpStatus.BAD_REQUEST,
+//       "New end time must be later than current end time"
+//     );
+
+//   const hourlyRate = booking.car.dailyPrice / 24;
+//   const extraHours = Math.ceil(Math.abs(newEnd - oldEnd) / 36e5);
+//   const extraAmount = extraHours * hourlyRate;
+
+//   // log extension
+//   booking.extensions.push({
+//     oldEnd,
+//     newEnd,
+//     extraHours,
+//     extraAmount
+//   });
+
+//   booking.endDateTime = newEnd;
+//   booking.totalPrice += extraAmount;
+//   booking.isExtended = true;
+
+//   await booking.save();
+//   return booking;
+// };
+
+
+
+export const extendBooking = async (bookingId, customerId, newEndTime) => {
+  const booking = await Booking.findById(bookingId).populate("car");
+
+  if (!booking) throw new ApiError(httpStatus.NOT_FOUND, "Booking not found");
+
+  if (booking.customer.toString() !== customerId)
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only the customer can extend their booking"
+    );
+
+  if (booking.status !== "ongoing" && booking.status !== "confirmed")
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Booking must be active to extend"
+    );
+
+  const oldEnd = booking.endDateTime;
+  const newEnd = new Date(newEndTime);
+
+  if (newEnd <= oldEnd)
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "New end time must be later than current end time"
+    );
+
+  const hourlyRate = booking.car.dailyPrice / 24;
+  const extraHours = Math.ceil(Math.abs(newEnd - oldEnd) / 36e5);
+  const extraAmount = extraHours * hourlyRate;
+
+  // log extension
+  booking.extensions.push({
+    oldEnd,
+    newEnd,
+    extraHours,
+    extraAmount
+  });
+
+  booking.endDateTime = newEnd;
+  booking.totalPrice += extraAmount;
+  booking.isExtended = true;
+
+  await booking.save();
+  return booking;
+};
+
