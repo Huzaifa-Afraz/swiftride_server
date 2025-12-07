@@ -11,6 +11,7 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema
 } from "../validations/password.validation.js";
+import { authenticate } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
@@ -41,6 +42,7 @@ router.post(
   validate(resetPasswordSchema),
   authController.resetPassword
 );
+router.post("/logout", authenticate, authController.logout);
 
 
 export default router;

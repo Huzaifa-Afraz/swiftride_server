@@ -36,6 +36,15 @@ export const loginUser = catchAsync(async (req, res) => {
   console.log("Login attempt for email:", email);
 
   const result = await authService.loginUser(email, password);
+  console.log("Setting cookie for user:", result.user._id);
+  console.log("Token:", result.token);
+   res.cookie("token", result.token, {
+    httpOnly: true,
+    secure: false,        // true on production/https
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/"
+  });
 
   sendSuccessResponse(res, httpStatus.OK, "Login successful", {
     user: result.user,
@@ -120,4 +129,15 @@ export const resetPassword = catchAsync(async (req, res) => {
     "Password has been reset successfully.",
     { email: user.email }
   );
+});
+
+export const logout = catchAsync(async (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: false,
+    sameSite: "lax",
+    path: "/"
+  });
+
+  return sendSuccessResponse(res, httpStatus.OK, "Logout successful");
 });
