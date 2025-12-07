@@ -141,3 +141,13 @@ export const logout = catchAsync(async (req, res) => {
 
   return sendSuccessResponse(res, httpStatus.OK, "Logout successful");
 });
+
+
+export const getMe = catchAsync(async (req, res) => {
+  const userId = req.user.id; // set by authenticate middleware
+
+  const user = await authService.getCurrentUser(userId);
+
+  // Shape: { success, message, data: { user } }
+  sendSuccessResponse(res, httpStatus.OK, "Current user fetched", { user });
+});
