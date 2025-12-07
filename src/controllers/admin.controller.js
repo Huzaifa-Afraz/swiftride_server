@@ -95,6 +95,42 @@ const mapBookingSummaryDTO = (booking) => {
 //   sendSuccessResponse(res, httpStatus.OK, "KYC records fetched", result);
 // });
 
+
+export const getDashboardStats = catchAsync(async (req, res) => {
+  const stats = await adminService.getDashboardStats();
+
+  sendSuccessResponse(res, httpStatus.OK, "Admin dashboard stats", stats);
+});
+
+// GET /admin/users?role=customer&page=1&limit=20
+export const getAdminUsers = catchAsync(async (req, res) => {
+  const { role, page = 1, limit = 20 } = req.query;
+
+  const { users, pagination } = await adminService.getAdminUsers({
+    role,
+    page: Number(page),
+    limit: Number(limit),
+  });
+
+  sendSuccessResponse(res, httpStatus.OK, "Admin users list", {
+    users,
+    pagination,
+  });
+});
+
+// PATCH /admin/users/:id/status
+export const updateUserStatus = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body; // "active" | "banned"
+console.log(id, status)
+  const updatedUser = await adminService.updateUserStatus(id, status);
+
+  sendSuccessResponse(res, httpStatus.OK, "User status updated", {
+    user: updatedUser,
+  });
+});
+
+
 export const getAllKyc = catchAsync(async (req, res) => {
   const { status, type, page, limit, q } = req.query;
 

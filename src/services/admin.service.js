@@ -12,6 +12,202 @@ import { Car } from "../models/car.model.js";
 
 
 
+export const getDashboardStats = async () => {
+  // Users by role
+  const [customerCount, hostCount, showroomCount] = await Promise.all([
+    User.countDocuments({ role: "customer" }),
+    User.countDocuments({ role: "host" }),
+    User.countDocuments({ role: "showroom" }),
+  ]);
+
+  // KYC status (map "approved" => "verified")
+  const [kycPending, kycApproved, kycRejected] = await Promise.all([
+    Kyc.countDocuments({ status: "pending" }),
+    Kyc.countDocuments({ status: "approved" }),
+    Kyc.countDocuments({ status: "rejected" }),
+  ]);
+
+  // Cars
+  const totalCars = await Car.countDocuments({});
+  // Cars that are currently booked (confirmed or ongoing)
+  const bookedCarIds = await Booking.distinct("car", {
+    status: { $in: ["confirmed", "ongoing"] },
+  });
+  const bookedCount = bookedCarIds.length;
+  const availableCount = Math.max(totalCars - bookedCount, 0);
+
+  // Bookings by status
+  const [pendingBookings, confirmedBookings, completedBookings, cancelledBookings] =
+    await Promise.all([
+      Booking.countDocuments({ status: "pending" }),
+      Booking.countDocuments({ status: "confirmed" }),
+      Booking.countDocuments({ status: "ongoing" }), // you may want to merge ongoing into confirmed or completed in charts
+      Booking.countDocuments({ status: "completed" }),
+      // NOTE: if you want EXACT mapping to expected output,
+      // you can decide how to aggregate "ongoing" (e.g., add it to confirmed)
+    ]);
+
+  // For chart simplification: treat "ongoing" as "confirmed"
+  const bookingsStats = {
+    pending: pendingBookings,
+    confirmed: confirmedBookings + completedBookings === 0 ? 0 : confirmedBookings, // adjust as per your business logic
+    completed: completedBookings,
+    cancelled: cancelledBookings,
+  };
+
+  // Revenue: sum platformFee from paid bookings
+  const revenueAgg = await Booking.aggregate([
+    { $match: { paymentStatus: "paid" } }, // adjust if your field is different
+    {
+      $group: {
+        _id: null,
+        totalPlatformFee: { $sum: "$platformFee" }, // make sure Booking has "platformFee" field
+      },
+    },
+  ]);
+
+  const totalPlatformFee =
+    revenueAgg.length > 0 ? revenueAgg[0].totalPlatformFee : 0;
+
+  return {
+    users: {
+      customer: customerCount,
+      host: hostCount,
+      showroom: showroomCount,
+    },
+    kyc: {
+      pending: kycPending,
+      verified: kycApproved, // "approved" -> "verified"
+      rejected: kycRejected,
+    },
+    cars: {
+      total: totalCars,
+      available: availableCount,
+      booked: bookedCount,
+    },
+    bookings: bookingsStats,
+    revenue: {
+      totalPlatformFee,
+    },
+  };
+};
+
+// 2 + 3 + 4) User listing for role = customer | host | showroom
+export const getAdminUsers = async ({ role, page = 1, limit = 20 }) => {
+  const allowedRoles = ["customer", "host", "showroom"];
+  if (!allowedRoles.includes(role)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid role filter");
+  }
+
+  const skip = (page - 1) * limit;
+
+  const [users, total] = await Promise.all([
+    User.find({ role })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    User.countDocuments({ role }),
+  ]);
+
+  // Preload car counts for host/showroom in a single aggregation
+  let carCountMap = {};
+  if (role === "host" || role === "showroom") {
+    const ownerIds = users.map((u) => u._id);
+    const carCounts = await Car.aggregate([
+      { $match: { owner: { $in: ownerIds } } }, // adjust field "owner" to your schema
+      {
+        $group: {
+          _id: "$owner",
+          carCount: { $sum: 1 },
+        },
+      },
+    ]);
+
+    carCountMap = carCounts.reduce((acc, item) => {
+      acc[item._id.toString()] = item.carCount;
+      return acc;
+    }, {});
+  }
+
+  const mappedUsers = users.map((user) => {
+    const base = {
+      _id: user._id,
+      email: user.email,
+      status: user.status || "active", // default
+      isVerified: !!user.isKycApproved, // or user.kycStatus === "approved"
+      createdAt: user.createdAt,
+    };
+
+    if (role === "customer") {
+      return {
+        ...base,
+        fullName: user.fullName,
+        phoneNumber: user.phoneNumber,
+      };
+    }
+
+    if (role === "host") {
+      return {
+        ...base,
+        fullName: user.fullName,
+        phoneNumber: user.phoneNumber,
+        carCount: carCountMap[user._id.toString()] || 0,
+      };
+    }
+
+    // showroom
+    return {
+      ...base,
+      showroomName: user.showroomName || user.fullName, // fallback if needed
+      carCount: carCountMap[user._id.toString()] || 0,
+    };
+  });
+
+  const totalPages = Math.ceil(total / limit) || 1;
+
+  return {
+    users: mappedUsers,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages,
+    },
+  };
+};
+
+// Update user status: active / banned
+export const updateUserStatus = async (userId, status) => {
+  const allowedStatuses = ["active", "banned"];
+  if (!allowedStatuses.includes(status)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid status value");
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  user.status = status;
+  await user.save();
+
+  // return minimal safe fields
+  console.log(`Updated user ${userId} status to ${status}`);
+  console.log(user);
+  return {
+    _id: user._id,
+    fullName: user.fullName,
+    showroomName: user.showroomName,
+    email: user.email,
+    phoneNumber: user.phoneNumber,
+    role: user.role,
+    status: user.status,
+    isVerified: !!user.isKycApproved,
+    createdAt: user.createdAt,
+  };
+};
+
+
 export const approveKyc = async (kycId) => {
   const kyc = await Kyc.findById(kycId);
   if (!kyc) {

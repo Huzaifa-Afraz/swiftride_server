@@ -24,6 +24,11 @@ const userSchema = new mongoose.Schema(
       enum: USER_ROLES,
       required: true
     },
+    status: {
+      type: String,
+      enum: ["active", "banned"],
+      default: "active"
+    },
 
     // Auth
     googleId: { type: String },
