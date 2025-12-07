@@ -57,7 +57,18 @@ const bookingSchema = new mongoose.Schema(
 
     isExtended: { type: Boolean, default: false },
     extensions: [extensionSchema],
-
+      platformCommissionPercent: {
+    type: Number,
+    default: Number(process.env.WALLET_PLATFORM_COMMISSION_PERCENT || 10) // 10% default
+  },
+  platformCommissionAmount: {
+    type: Number,
+    default: 0
+  },
+  ownerEarningAmount: {
+    type: Number,
+    default: 0
+  },
     paymentStatus: {
       type: String,
       enum: ["unpaid", "processing", "paid", "failed"],

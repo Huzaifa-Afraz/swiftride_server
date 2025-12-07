@@ -9,5 +9,6 @@ router.use(authenticate, authorizeRoles("admin"));
 router.get("/kyc", adminController.getAllKyc);
 router.patch("/kyc/:kycId/approve", adminController.approveKyc);
 router.patch("/kyc/:kycId/reject", adminController.rejectKyc);
-
+router.get("/bookings", adminController.getAllBookings);
+router.get("/bookings/:bookingId", adminController.getBookingDetail);
 export default router;

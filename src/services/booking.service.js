@@ -9,6 +9,7 @@ import { Car } from "../models/car.model.js";
 import { User, USER_ROLE } from "../models/user.model.js";
 import { generateInvoicePDF } from "./invoice.service.js";
 import { sendBookingInvoiceEmail } from "../utils/email.js";
+import * as walletService from "./wallet.service.js";
 
 const pushStatusHistory = (booking, status, changedBy, note) => {
   booking.statusHistory.push({
@@ -180,25 +181,77 @@ export const createBooking = async (customerId, payload) => {
   if (car.owner.toString() === customerId)
     throw new ApiError(httpStatus.BAD_REQUEST, "You cannot book your own car");
 
-  const start = new Date(startDateTime);
+  // const start = new Date(startDateTime);
+  // const end = new Date(endDateTime);
+
+  // if (start >= end)
+  //   throw new ApiError(httpStatus.BAD_REQUEST, "Invalid booking dates");
+
+  // // overlap
+  // const overlapping = await Booking.findOne({
+  //   car: carId,
+  //   status: { $in: ["pending", "confirmed", "ongoing"] },
+  //   $or: [{ startDateTime: { $lte: end }, endDateTime: { $gte: start } }]
+  // });
+
+  // if (overlapping)
+  //   throw new ApiError(httpStatus.BAD_REQUEST, "Car is already booked");
+
+  // const hourlyRate = car.dailyPrice / 24;
+  // const durationHours = Math.ceil(Math.abs(end - start) / 36e5);
+  // const totalPrice = hourlyRate * durationHours;
+
+  // const invoiceNumber = `INV-${Date.now()}-${Math.floor(
+  //   Math.random() * 9999
+  // )}`;
+
+  // const booking = await Booking.create({
+  //   car: carId,
+  //   customer,
+  //   owner: car.owner,
+  //   startDateTime: start,
+  //   endDateTime: end,
+  //   durationHours,
+  //   totalPrice,
+  //   invoiceNumber,
+  //   status: "pending"
+  // });
+    const start = new Date(startDateTime);
   const end = new Date(endDateTime);
 
-  if (start >= end)
+  if (start >= end) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid booking dates");
+  }
 
-  // overlap
-  const overlapping = await Booking.findOne({
-    car: carId,
-    status: { $in: ["pending", "confirmed", "ongoing"] },
-    $or: [{ startDateTime: { $lte: end }, endDateTime: { $gte: start } }]
-  });
+  // Optional: basic availability check
+  if (car.availability?.isAvailable) {
+    const startDay = start.getDay(); // 0-6
+    const endDay = end.getDay();
 
-  if (overlapping)
-    throw new ApiError(httpStatus.BAD_REQUEST, "Car is already booked");
+    const daysAllowed = car.availability.daysOfWeek || [0,1,2,3,4,5,6];
+    if (!daysAllowed.includes(startDay) || !daysAllowed.includes(endDay)) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        "Car is not available on selected days"
+      );
+    }
+    // you can further check time within startTime/endTime if you want
+  }
 
-  const hourlyRate = car.dailyPrice / 24;
   const durationHours = Math.ceil(Math.abs(end - start) / 36e5);
-  const totalPrice = hourlyRate * durationHours;
+
+  let pricePerHour = car.pricePerHour;
+  if (!pricePerHour && car.pricePerDay) {
+    pricePerHour = car.pricePerDay / 24;
+  }
+  if (!pricePerHour) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Car has no pricing configured"
+    );
+  }
+
+  const totalPrice = pricePerHour * durationHours;
 
   const invoiceNumber = `INV-${Date.now()}-${Math.floor(
     Math.random() * 9999
@@ -215,6 +268,8 @@ export const createBooking = async (customerId, payload) => {
     invoiceNumber,
     status: "pending"
   });
+
+
 
   booking.statusHistory.push({
   status: "pending",
@@ -296,6 +351,85 @@ export const getOwnerBookings = async (ownerId) => {
 
 //   return booking;
 // };
+// export const updateBookingStatus = async (
+//   bookingId,
+//   ownerId,
+//   newStatus,
+//   note
+// ) => {
+//   const booking = await Booking.findById(bookingId)
+//     .populate("customer")
+//     .populate("car")
+//     .populate("owner");
+
+//   if (!booking) {
+//     throw new ApiError(httpStatus.NOT_FOUND, "Booking not found");
+//   }
+
+//   if (booking.owner._id.toString() !== ownerId.toString()) {
+//     throw new ApiError(
+//       httpStatus.FORBIDDEN,
+//       "You are not allowed to modify this booking"
+//     );
+//   }
+
+//   const allowedStatuses = ["pending", "confirmed", "ongoing", "completed", "cancelled"];
+//   if (!allowedStatuses.includes(newStatus)) {
+//     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid status");
+//   }
+
+//   // Simple workflow rules
+//   const current = booking.status;
+//   if (current === "completed" || current === "cancelled") {
+//     throw new ApiError(
+//       httpStatus.BAD_REQUEST,
+//       "Cannot change status of a completed/cancelled booking"
+//     );
+//   }
+
+//   if (newStatus === "confirmed") {
+//     if (!booking.customer.isKycApproved) {
+//       throw new ApiError(
+//         httpStatus.FORBIDDEN,
+//         "Customer KYC is not approved. Cannot confirm booking."
+//       );
+//     }
+//   }
+
+//   booking.status = newStatus;
+//   pushStatusHistory(booking, newStatus, ownerId, note);
+
+//   // On confirm – generate invoice + email
+//   const prevStatus = current; // store before change
+//   if (newStatus === "confirmed") {
+//     const pdfPath = generateInvoicePDF(
+//       booking,
+//       booking.car,
+//       booking.customer,
+//       booking.owner
+//     );
+//     booking.pdfPath = pdfPath;
+
+//     // fire-and-forget email
+//     (async () => {
+//       try {
+//         await sendBookingInvoiceEmail(
+//           booking.customer,
+//           booking,
+//           pdfPath
+//         );
+//       } catch (err) {
+//         console.error("Error sending invoice email:", err.message);
+//       }
+//     })();
+//   }
+
+//   await booking.save();
+//     if (prevStatus !== "completed" && newStatus === "completed") {
+//     await walletService.releaseBookingEarning(booking._id);
+//   }
+//   return booking;
+// };
 export const updateBookingStatus = async (
   bookingId,
   ownerId,
@@ -318,21 +452,49 @@ export const updateBookingStatus = async (
     );
   }
 
-  const allowedStatuses = ["pending", "confirmed", "ongoing", "completed", "cancelled"];
+  const allowedStatuses = [
+    "pending",
+    "confirmed",
+    "ongoing",
+    "completed",
+    "cancelled"
+  ];
   if (!allowedStatuses.includes(newStatus)) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid status");
   }
 
-  // Simple workflow rules
-  const current = booking.status;
-  if (current === "completed" || current === "cancelled") {
+  const prevStatus = booking.status;
+
+  // Cannot modify final states
+  if (prevStatus === "completed" || prevStatus === "cancelled") {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
       "Cannot change status of a completed/cancelled booking"
     );
   }
 
+  // Optional strict transition rules:
+  // const allowedTransitions = {
+  //   pending: ["confirmed", "cancelled"],
+  //   confirmed: ["ongoing", "cancelled"],
+  //   ongoing: ["completed", "cancelled"],
+  //   completed: [],
+  //   cancelled: []
+  // };
+  // if (!allowedTransitions[prevStatus].includes(newStatus)) {
+  //   throw new ApiError(
+  //     httpStatus.BAD_REQUEST,
+  //     `Cannot change status from ${prevStatus} to ${newStatus}`
+  //   );
+  // }
+
   if (newStatus === "confirmed") {
+    if (booking.paymentStatus !== "paid") {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        "Booking payment is not completed. Cannot confirm booking."
+      );
+    }
     if (!booking.customer.isKycApproved) {
       throw new ApiError(
         httpStatus.FORBIDDEN,
@@ -354,14 +516,9 @@ export const updateBookingStatus = async (
     );
     booking.pdfPath = pdfPath;
 
-    // fire-and-forget email
     (async () => {
       try {
-        await sendBookingInvoiceEmail(
-          booking.customer,
-          booking,
-          pdfPath
-        );
+        await sendBookingInvoiceEmail(booking.customer, booking, pdfPath);
       } catch (err) {
         console.error("Error sending invoice email:", err.message);
       }
@@ -369,8 +526,15 @@ export const updateBookingStatus = async (
   }
 
   await booking.save();
+
+  // On completed – release wallet earnings
+  if (prevStatus !== "completed" && newStatus === "completed") {
+    await walletService.releaseBookingEarning(booking._id);
+  }
+
   return booking;
 };
+
 
 
 

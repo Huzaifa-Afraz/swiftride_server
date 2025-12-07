@@ -42,6 +42,59 @@ export const createBooking = catchAsync(async (req, res) => {
 });
 
 
+const mapBookingSummaryForUser = (booking) => {
+  return {
+    id: booking._id,
+    invoiceNumber: booking.invoiceNumber,
+    status: booking.status,
+    paymentStatus: booking.paymentStatus,
+    startDateTime: booking.startDateTime,
+    endDateTime: booking.endDateTime,
+    durationHours: booking.durationHours,
+    totalPrice: booking.totalPrice,
+    currency: booking.currency,
+    isPaid: booking.paymentStatus === "paid",
+
+    car: booking.car
+      ? {
+          id: booking.car._id,
+          make: booking.car.make,
+          model: booking.car.model,
+          year: booking.car.year,
+          primaryPhoto:
+            booking.car.photos && booking.car.photos.length > 0
+              ? booking.car.photos[0]
+              : null,
+          location: booking.car.location || null
+        }
+      : null,
+
+    // For /me endpoint, we don't need customer/owner details – caller knows who they are
+    createdAt: booking.createdAt,
+    updatedAt: booking.updatedAt
+  };
+};
+
+const mapBookingDetailForUser = (booking) => {
+  const base = mapBookingSummaryForUser(booking);
+
+  return {
+    ...base,
+    // minimal extra for user-facing detail
+    invoicePdfPath: booking.pdfPath || null,
+    invoiceDownloadPath: booking._id
+      ? `/api/bookings/invoice/${booking._id}`
+      : null,
+    statusTimeline: (booking.statusHistory || []).map((h) => ({
+      status: h.status,
+      changedAt: h.changedAt,
+      note: h.note
+    }))
+  };
+};
+
+
+
 // export const updateBookingStatus = catchAsync(async (req, res) => {
 //   const ownerId = req.user.id;
 //   const { bookingId } = req.params;
@@ -79,23 +132,61 @@ export const updateBookingStatus = catchAsync(async (req, res) => {
 
 
 
-export const getMyBookings = catchAsync(async (req, res) => {
-  const customerId = req.user.id;
-  const bookings = await bookingService.getCustomerBookings(customerId);
+// export const getMyBookings = catchAsync(async (req, res) => {
+//   const customerId = req.user.id;
+//   const bookings = await bookingService.getCustomerBookings(customerId);
 
-  sendSuccessResponse(res, httpStatus.OK, "Your bookings fetched successfully", {
-    bookings
+//   sendSuccessResponse(res, httpStatus.OK, "Your bookings fetched successfully", {
+//     bookings
+//   });
+// });
+export const getMyBookings = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+
+  const bookings = await Booking.find({ customer: userId })
+    .populate("car", "make model year photos location")
+    .sort({ createdAt: -1 });
+
+  const items = bookings.map(mapBookingSummaryForUser);
+
+  sendSuccessResponse(res, httpStatus.OK, "My bookings fetched", {
+    items
   });
 });
 
+
+// export const getOwnerBookings = catchAsync(async (req, res) => {
+//   const ownerId = req.user.id;
+//   const bookings = await bookingService.getOwnerBookings(ownerId);
+
+//   sendSuccessResponse(res, httpStatus.OK, "Owner bookings fetched successfully", {
+//     bookings
+//   });
+// });
 export const getOwnerBookings = catchAsync(async (req, res) => {
   const ownerId = req.user.id;
-  const bookings = await bookingService.getOwnerBookings(ownerId);
 
-  sendSuccessResponse(res, httpStatus.OK, "Owner bookings fetched successfully", {
-    bookings
+  const bookings = await Booking.find({ owner: ownerId })
+    .populate("car", "make model year photos location")
+    .populate("customer", "fullName email")
+    .sort({ createdAt: -1 });
+
+  const items = bookings.map((b) => ({
+    ...mapBookingSummaryForUser(b),
+    customer: b.customer
+      ? {
+          id: b.customer._id,
+          name: b.customer.fullName,
+          email: b.customer.email
+        }
+      : null
+  }));
+
+  sendSuccessResponse(res, httpStatus.OK, "Owner bookings fetched", {
+    items
   });
 });
+
 
 // export const updateBookingStatus = catchAsync(async (req, res) => {
 //   const ownerId = req.user.id;
@@ -146,4 +237,45 @@ export const downloadInvoice = catchAsync(async (req, res) => {
   }
 
   return res.download(booking.pdfPath);
+});
+
+
+export const getBookingDetailForUser = catchAsync(async (req, res) => {
+  const { bookingId } = req.params;
+  const userId = req.user.id;
+  const userRole = req.user.role;
+
+  const booking = await Booking.findById(bookingId)
+    .populate("car", "make model year photos location")
+    .populate("customer", "fullName email")
+    .populate("owner", "fullName email");
+
+  if (!booking) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Booking not found");
+  }
+
+  // Only customer, owner, or admin can see
+  const isCustomer = booking.customer?.id?.toString() === userId.toString();
+  const isOwner = booking.owner?.id?.toString() === userId.toString();
+  const isAdmin = userRole === "admin";
+
+  if (!isCustomer && !isOwner && !isAdmin) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "You are not allowed to view this booking"
+    );
+  }
+
+  const data = mapBookingDetailForUser(booking);
+
+  // For owner/admin, add earnings info
+  if (isOwner || isAdmin) {
+    data.ownerEarningAmount = booking.ownerEarningAmount;
+    data.platformCommissionAmount = booking.platformCommissionAmount;
+    data.platformCommissionPercent = booking.platformCommissionPercent;
+  }
+
+  sendSuccessResponse(res, httpStatus.OK, "Booking detail fetched", {
+    booking: data
+  });
 });

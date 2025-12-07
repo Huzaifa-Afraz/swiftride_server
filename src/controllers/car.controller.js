@@ -20,38 +20,60 @@ import catchAsync from "../utils/catchAsync.js";
 import * as carService from "../services/car.service.js";
 import { sendSuccessResponse } from "../utils/response.js";
 
-export const createCar = catchAsync(async (req, res) => {
-  const ownerId = req.user.id;
-  const ownerRole = req.user.role;
+export const createCar = async (ownerId, ownerRole, payload) => {
+  if (![USER_ROLE.HOST, USER_ROLE.SHOWROOM].includes(ownerRole)) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only hosts or showrooms can list cars"
+    );
+  }
+
+  const existingCount = await Car.countDocuments({ owner: ownerId });
+  if (existingCount >= MAX_CARS_PER_USER) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      `You have reached the maximum car limit (${MAX_CARS_PER_USER})`
+    );
+  }
 
   const {
-    title,
-    description,
-    brand,
+    make,
     model,
     year,
-    dailyPrice,
-    location
-  } = req.body;
-
-  // images paths from multer
-  const images = (req.files?.images || []).map((f) => f.path);
-
-  const car = await carService.createCar(ownerId, ownerRole, {
-    title,
-    description,
-    brand,
-    model,
-    year,
-    dailyPrice,
+    color,
+    plateNumber,
+    pricePerHour,
+    pricePerDay,
+    seats,
+    transmission,
+    fuelType,
+    photos,
     location,
-    images
+    availability,
+    features
+  } = payload;
+
+  const car = await Car.create({
+    owner: ownerId,
+    ownerRole,
+    make,
+    model,
+    year,
+    color,
+    plateNumber,
+    pricePerHour,
+    pricePerDay,
+    seats,
+    transmission,
+    fuelType,
+    photos: photos || [],
+    location,
+    availability,
+    features: features || []
   });
 
-  sendSuccessResponse(res, httpStatus.CREATED, "Car created successfully", {
-    car
-  });
-});
+  return car;
+};
 
 
 export const getMyCars = catchAsync(async (req, res) => {

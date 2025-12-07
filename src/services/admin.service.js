@@ -7,6 +7,8 @@ import httpStatus from "http-status";
 import ApiError from "../utils/ApiError.js";
 import { Kyc } from "../models/kyc.model.js";
 import { User } from "../models/user.model.js";
+import { Booking } from "../models/booking.model.js";
+import { Car } from "../models/car.model.js";
 
 
 
@@ -113,4 +115,96 @@ export const listKyc = async ({ status, type, page, limit, q }) => {
     total,
     totalPages: Math.ceil(total / limit)
   };
+};
+
+
+
+export const listBookings = async (query) => {
+  let {
+    status,
+    paymentStatus,
+    ownerId,
+    customerId,
+    ownerRole,
+    fromDate,
+    toDate,
+    q,
+    page,
+    limit
+  } = query;
+
+  const filter = {};
+
+  if (status) filter.status = status;
+  if (paymentStatus) filter.paymentStatus = paymentStatus;
+  if (ownerId) filter.owner = ownerId;
+  if (customerId) filter.customer = customerId;
+
+  // filter by owner role only if provided (host/showroom)
+  if (ownerRole) {
+    const owners = await User.find({ role: ownerRole }).select("_id");
+    filter.owner = { $in: owners.map((u) => u._id) };
+  }
+
+  // date filter on startDateTime
+  if (fromDate || toDate) {
+    filter.startDateTime = {};
+    if (fromDate) filter.startDateTime.$gte = new Date(fromDate);
+    if (toDate) filter.startDateTime.$lte = new Date(toDate);
+  }
+
+  // search text on customer / owner
+  let userFilterIds = null;
+  if (q && q.trim().length > 0) {
+    const text = q.trim();
+    const users = await User.find({
+      $or: [
+        { fullName: { $regex: text, $options: "i" } },
+        { email: { $regex: text, $options: "i" } }
+      ]
+    }).select("_id");
+
+    userFilterIds = users.map((u) => u._id);
+    if (userFilterIds.length === 0) {
+      return { data: [], page: 1, total: 0, totalPages: 0 };
+    }
+
+    // match either customer or owner in that list
+    filter.$or = [{ customer: { $in: userFilterIds } }, { owner: { $in: userFilterIds } }];
+  }
+
+  page = Number(page) || 1;
+  limit = Number(limit) || 10;
+  const skip = (page - 1) * limit;
+
+  const [data, total] = await Promise.all([
+    Booking.find(filter)
+      .populate("customer", "fullName email role")
+      .populate("owner", "fullName email role")
+      .populate("car", "make model year photos location")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    Booking.countDocuments(filter)
+  ]);
+
+  return {
+    data,
+    page,
+    total,
+    totalPages: Math.ceil(total / limit)
+  };
+};
+
+export const getBookingByIdForAdmin = async (bookingId) => {
+  const booking = await Booking.findById(bookingId)
+    .populate("customer", "fullName email role isKycApproved")
+    .populate("owner", "fullName email role")
+    .populate("car");
+
+  if (!booking) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Booking not found");
+  }
+
+  return booking;
 };

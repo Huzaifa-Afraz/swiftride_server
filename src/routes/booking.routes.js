@@ -10,6 +10,7 @@ import express from "express";
 import { authenticate, authorizeRoles } from "../middlewares/auth.middleware.js";
 import { requireKycApproved } from "../middlewares/kyc.middleware.js";
 import * as bookingController from "../controllers/booking.controller.js";
+import { validate } from "../middlewares/validation.middleware.js";
 
 const router = express.Router();
 
@@ -100,6 +101,12 @@ router.get(
   bookingController.downloadInvoice
 );
 
+router.get(
+  "/:bookingId",
+  authenticate,
+  authorizeRoles("customer", "host", "showroom", "admin"),
+  bookingController.getBookingDetailForUser
+);
 
 
 

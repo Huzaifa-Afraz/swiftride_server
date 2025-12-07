@@ -4,7 +4,8 @@ import kycRoutes from "./kyc.routes.js";
 import adminRoutes from "./admin.routes.js";
 import carRoutes from "./car.routes.js";
 import bookingRoutes from "./booking.routes.js";
-import paymentRoutes from "./routes/payment.routes.js";
+import paymentRoutes from "./payment.routes.js";
+import walletRoutes from "./wallet.routes.js";
 
 const router = express.Router();
 
@@ -13,6 +14,7 @@ router.use("/kyc", kycRoutes);
 router.use("/admin", adminRoutes);
 router.use("/cars", carRoutes);
 router.use("/bookings", bookingRoutes);
-app.use("/api/payments", paymentRoutes);
+router.use("/api/payments", paymentRoutes);
+router.use("/api/wallet", walletRoutes);
 
 export default router;

@@ -33,6 +33,7 @@ export const signupUser = catchAsync(async (req, res) => {
 
 export const loginUser = catchAsync(async (req, res) => {
   const { email, password } = req.body;
+  console.log("Login attempt for email:", email);
 
   const result = await authService.loginUser(email, password);
 

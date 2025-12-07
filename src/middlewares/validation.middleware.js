@@ -16,6 +16,7 @@ export const validate =
       next();
     } catch (err) {
       const details = err.details?.map((d) => d.message).join(", ");
+      console.log("Validation error:", details);
       next(new ApiError(httpStatus.BAD_REQUEST, details || "Validation error"));
     }
   };

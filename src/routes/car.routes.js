@@ -9,6 +9,8 @@ import {
   searchCarsSchema
 } from "../validations/car.validation.js";
 
+
+
 const router = express.Router();
 
 // Public search / filters
@@ -24,7 +26,8 @@ router.post(
   authenticate,
   authorizeRoles("host", "showroom"),
   requireApprovedKyc,
-  carUpload.array("images", 10), // field name: images
+  // carUpload.array("photos", 10), // field name: images
+    carUpload.fields([{ name: "photos", maxCount: 10 }]),
   validate(createCarSchema),
   carController.createCar
 );

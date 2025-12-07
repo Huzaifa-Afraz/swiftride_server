@@ -2,7 +2,7 @@ import httpStatus from "http-status";
 import { Kyc } from "../models/kyc.model.js";
 import ApiError from "../utils/ApiError.js";
 
-// Ensure current user has at least one approved KYC record
+// // Ensure current user has at least one approved KYC record
 export const requireApprovedKyc = async (req, res, next) => {
   try {
     const userId = req.user?.id;
@@ -61,21 +61,21 @@ export const requireApprovedKyc = async (req, res, next) => {
 // };
 
 
-// // export const requireKycApproved = (req, res, next) => {
-// //   if (!req.user) {
-// //     return next(
-// //       new ApiError(httpStatus.UNAUTHORIZED, "Authentication required")
-// //     );
-// //   }
+export const requireKycApproved = (req, res, next) => {
+  if (!req.user) {
+    return next(
+      new ApiError(httpStatus.UNAUTHORIZED, "Authentication required")
+    );
+  }
 
-// //   if (!req.user.isKycApproved) {
-// //     return next(
-// //       new ApiError(
-// //         httpStatus.FORBIDDEN,
-// //         "Your KYC is not approved yet. Please complete and wait for approval."
-// //       )
-// //     );
-// //   }
+  if (!req.user.isKycApproved) {
+    return next(
+      new ApiError(
+        httpStatus.FORBIDDEN,
+        "Your KYC is not approved yet. Please complete and wait for approval."
+      )
+    );
+  }
 
-// //   next();
-// // };
+  next();
+};

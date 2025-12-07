@@ -2,6 +2,7 @@ import crypto from "crypto";
 import httpStatus from "http-status";
 import ApiError from "../utils/ApiError.js";
 import { Booking } from "../models/booking.model.js";
+import * as walletService from "./wallet.service.js";
 
 const provider = process.env.PAYMENT_PROVIDER || "EASYPAISA";
 
@@ -152,13 +153,25 @@ export const handleEasypaisaCallback = async (data) => {
   // TODO: Confirm from docs what responseCode means success
   const isSuccess = responseCode === "0000" || responseCode === "00";
 
+  // if (isSuccess) {
+  //   booking.paymentStatus = "paid";
+  //   booking.paymentReference = transactionId;
+  // } else {
+  //   booking.paymentStatus = "failed";
+  //   booking.paymentReference = transactionId;
+  // }
   if (isSuccess) {
-    booking.paymentStatus = "paid";
-    booking.paymentReference = transactionId;
-  } else {
-    booking.paymentStatus = "failed";
-    booking.paymentReference = transactionId;
-  }
+  booking.paymentStatus = "paid";
+  booking.paymentReference = transactionId;
+  await booking.save();
+
+  // ADD THIS:
+  await walletService.createBookingEarning(booking);
+} else {
+  booking.paymentStatus = "failed";
+  booking.paymentReference = transactionId;
+  await booking.save();
+}
 
   await booking.save();
 

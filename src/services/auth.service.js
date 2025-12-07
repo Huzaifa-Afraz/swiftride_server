@@ -71,6 +71,7 @@ export const signupUser = async ({ fullName, email, phoneNumber, password, role 
 
 
 export const loginUser = async (email, password) => {
+  console.log("Attempting login for email:", email, password);
   // Same login for ALL roles
   const user = await User.findOne({ email });
 
@@ -84,6 +85,8 @@ export const loginUser = async (email, password) => {
   }
 
   const tokens = generateAuthToken(user);
+  console.log("Login successful for user:", user._id, "Role:", user.role, tokens);
+
   return { user: sanitizeUser(user), tokens };
 };
 
