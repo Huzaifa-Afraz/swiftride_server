@@ -39,7 +39,7 @@ export const loginUser = catchAsync(async (req, res) => {
 
   sendSuccessResponse(res, httpStatus.OK, "Login successful", {
     user: result.user,
-    tokens: result.tokens
+    token: result.token
   });
 });
 

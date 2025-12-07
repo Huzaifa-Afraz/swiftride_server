@@ -87,7 +87,7 @@ export const loginUser = async (email, password) => {
   const tokens = generateAuthToken(user);
   console.log("Login successful for user:", user._id, "Role:", user.role, tokens);
 
-  return { user: sanitizeUser(user), tokens };
+  return { user: sanitizeUser(user), token:tokens?.accessToken };
 };
 
 export const signupShowroom = async ({ showroomName, email, password }) => {
