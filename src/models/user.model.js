@@ -32,7 +32,9 @@ const userSchema = new mongoose.Schema(
 
     // Auth
     googleId: { type: String },
-    isEmailVerified: { type: Boolean, default: false }
+    isEmailVerified: { type: Boolean, default: false },
+    isVerified: { type: Boolean, default: false } // KYC verified
+
   },
   { timestamps: true }
 );

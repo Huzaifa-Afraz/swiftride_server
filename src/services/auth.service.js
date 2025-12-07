@@ -7,14 +7,35 @@ import { PasswordResetToken } from "../models/passwordReset.model.js";
 import { sendPasswordResetEmail } from "../utils/email.js";
 import { User, USER_ROLE } from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
+import { Kyc } from "../models/kyc.model.js";
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-const sanitizeUser = (user) => {
-  const obj = user.toObject();
-  delete obj.password;
-  return obj;
+// const sanitizeUser = (user) => {
+//   const obj = user.toObject();
+//   delete obj.password;
+//   return obj;
+// };
+export const sanitizeUser = (userDoc) => {
+  if (!userDoc) return null;
+  const u = userDoc.toObject ? userDoc.toObject() : userDoc;
+
+  return {
+    _id: u._id,
+    fullName: u.fullName,
+    showroomName: u.showroomName,
+    email: u.email,
+    phoneNumber: u.phoneNumber,
+    role: u.role,
+    status: u.status,
+    isEmailVerified: !!u.isEmailVerified,
+    isVerified: !!u.isVerified,   // friendly flag
+    isKycApproved: !!u.isVerified, // legacy flag
+    createdAt: u.createdAt,
+    updatedAt: u.updatedAt
+  };
 };
+
 
 export const generateAuthToken = (user) => {
   const payload = {
@@ -247,12 +268,27 @@ export const resetPasswordWithToken = async (token, newPassword) => {
 
 
 
+// export const getCurrentUser = async (userId) => {
+//   const user = await User.findById(userId);
+
+//   if (!user) {
+//     console.error("User not found with ID:", userId);
+//     throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+//   }
+// console.log("Fetched user:", sanitizeUser(user));
+//   return sanitizeUser(user);
+// };
+
+
 export const getCurrentUser = async (userId) => {
   const user = await User.findById(userId);
 
   if (!user) {
+    console.error("User not found with ID:", userId);
     throw new ApiError(httpStatus.NOT_FOUND, "User not found");
   }
 
-  return sanitizeUser(user);
+  const sanitized = sanitizeUser(user);
+
+  return sanitized;
 };

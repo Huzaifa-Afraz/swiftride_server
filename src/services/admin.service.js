@@ -216,10 +216,14 @@ export const approveKyc = async (kycId) => {
 
   kyc.status = "approved";
   await kyc.save();
+  console.log("kyc record approved:", kycId);
+  console.log("kyc:", kyc);
+
+  console.log("KYC approved for user:", kyc.user);
 
   const user = await User.findByIdAndUpdate(
     kyc.user,
-    { isKycApproved: true },
+    { isVerified: true },
     { new: true }
   );
 

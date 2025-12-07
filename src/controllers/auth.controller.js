@@ -149,5 +149,5 @@ export const getMe = catchAsync(async (req, res) => {
   const user = await authService.getCurrentUser(userId);
 
   // Shape: { success, message, data: { user } }
-  sendSuccessResponse(res, httpStatus.OK, "Current user fetched", { user });
+  sendSuccessResponse(res, httpStatus.OK, "Current user fetched",  user );
 });
