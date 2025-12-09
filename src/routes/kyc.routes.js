@@ -35,4 +35,9 @@ router.post(
   kycController.submitShowroomKyc
 );
 
+router.get(
+  "/status",
+  authenticate,
+  kycController.getMyKyc
+);
 export default router;
