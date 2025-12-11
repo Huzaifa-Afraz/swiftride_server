@@ -38,3 +38,15 @@ export const getCarById = catchAsync(async (req, res) => {
   }
   sendSuccessResponse(res, httpStatus.OK, "Car fetched successfully", { car });
 });
+
+export const updateCar = catchAsync(async (req, res) => {
+  // We pass req.body directly. If you support image updates, handle req.files here too.
+  const car = await carService.updateCar(req.params.id, req.user.id, req.body);
+  sendSuccessResponse(res, httpStatus.OK, "Car updated successfully", { car });
+});
+
+// ✅ NEW: Delete Handler
+export const deleteCar = catchAsync(async (req, res) => {
+  await carService.deleteCar(req.params.id, req.user.id);
+  sendSuccessResponse(res, httpStatus.OK, "Car deleted successfully");
+});

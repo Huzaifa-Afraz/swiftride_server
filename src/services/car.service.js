@@ -47,3 +47,35 @@ export const searchCars = async (query) => {
   
   return await Car.find(filter);
 };
+
+export const updateCar = async (carId, userId, updateBody) => {
+  const car = await Car.findById(carId);
+  if (!car) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Car not found");
+  }
+
+  // Security: Check ownership
+  if (car.owner.toString() !== userId) {
+    throw new ApiError(httpStatus.FORBIDDEN, "You are not authorized to update this car");
+  }
+
+  // Update fields
+  Object.assign(car, updateBody);
+  await car.save();
+  return car;
+};
+
+// ✅ NEW: Delete Car
+export const deleteCar = async (carId, userId) => {
+  const car = await Car.findById(carId);
+  if (!car) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Car not found");
+  }
+
+  if (car.owner.toString() !== userId) {
+    throw new ApiError(httpStatus.FORBIDDEN, "You are not authorized to delete this car");
+  }
+
+  await Car.findByIdAndDelete(carId);
+  return car;
+};
