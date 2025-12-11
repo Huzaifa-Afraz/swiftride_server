@@ -302,7 +302,7 @@ export const listKyc = async ({ status, type, page, limit, q }) => {
   }
 
   const data = await Kyc.find(filter)
-    .populate("user", "fullName email role isKycApproved")
+    .populate("user", "fullName email role isVerified")
     .skip(skip)
     .limit(limit)
     .sort({ createdAt: -1 });

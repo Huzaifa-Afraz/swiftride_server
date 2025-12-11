@@ -26,11 +26,11 @@ router.post(
   authenticate,
   authorizeRoles("host", "showroom"),
   requireApprovedKyc,
-  // carUpload.array("photos", 10), // field name: images
-    carUpload.fields([{ name: "photos", maxCount: 10 }]),
-  validate(createCarSchema),
+  carUpload.fields([{ name: "photos", maxCount: 10 }]),
   carController.createCar
 );
+
+  // validate(createCarSchema),
 
 // Get current owner's cars
 router.get(
@@ -40,4 +40,9 @@ router.get(
   carController.getMyCars
 );
 
+
+
+
+// public routes for getting car details could be added here
+router.get("/:carId", carController.getCarById);
 export default router;

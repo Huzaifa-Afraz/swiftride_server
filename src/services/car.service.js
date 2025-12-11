@@ -30,10 +30,12 @@ import httpStatus from "http-status";
 import ApiError from "../utils/ApiError.js";
 import { Car } from "../models/car.model.js";
 import { USER_ROLE } from "../models/user.model.js";
+import mongoose from "mongoose";
 
-const MAX_CARS_PER_USER = Number(process.env.MAX_CARS_PER_USER || 5);
+const MAX_CARS_PER_USER = Number(process.env.MAX_CARS_PER_USER || 20);
 
 export const createCar = async (ownerId, ownerRole, payload) => {
+  // 1. Role check
   if (![USER_ROLE.HOST, USER_ROLE.SHOWROOM].includes(ownerRole)) {
     throw new ApiError(
       httpStatus.FORBIDDEN,
@@ -41,7 +43,7 @@ export const createCar = async (ownerId, ownerRole, payload) => {
     );
   }
 
-  // Per-user car limit
+  // 2. Per-user car limit
   const existingCount = await Car.countDocuments({ owner: ownerId });
   if (existingCount >= MAX_CARS_PER_USER) {
     throw new ApiError(
@@ -50,6 +52,15 @@ export const createCar = async (ownerId, ownerRole, payload) => {
     );
   }
 
+  // 3. (Optional) Minimal validation
+  if (!payload.make || !payload.model || !payload.year || !payload.plateNumber) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Make, model, year and plate number are required"
+    );
+  }
+
+  // 4. Create car
   const car = await Car.create({
     ...payload,
     owner: ownerId,
@@ -112,4 +123,22 @@ export const searchCars = async (filters, pagination) => {
     total,
     totalPages
   };
+};
+
+
+
+export const getCarById = async (carId) => {
+  if (!mongoose.Types.ObjectId.isValid(carId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid car id");
+  }
+
+  const car = await Car.findById(carId)
+    .populate("owner", "fullName showroomName role email phoneNumber")
+    .lean();
+
+  if (!car) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Car not found");
+  }
+
+  return car;
 };
