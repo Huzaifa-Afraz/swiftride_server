@@ -1,26 +1,30 @@
 import express from "express";
-import { authenticate, authorizeRoles } from "../middlewares/auth.middleware.js";
+import {
+  authenticate,
+  authorizeRoles,
+} from "../middlewares/auth.middleware.js";
 import { requireApprovedKyc } from "../middlewares/kyc.middleware.js";
 import { carUpload } from "../config/multer.js";
 import * as carController from "../controllers/car.controller.js";
 import { validate } from "../middlewares/validation.middleware.js";
 import {
   createCarSchema,
-  searchCarsSchema
+  searchCarsSchema,
 } from "../validations/car.validation.js";
-
-
 
 const router = express.Router();
 
-// Public search / filters
+router.get("/", validate(searchCarsSchema, "query"), carController.searchCars);
+
 router.get(
-  "/",
-  validate(searchCarsSchema, "query"),
-  carController.searchCars
+  "/me",
+  authenticate,
+  authorizeRoles("host", "showroom"),
+  carController.getMyCars
 );
 
-// Create a car listing (host / showroom with approved KYC)
+router.get("/:id", carController.getCarById);
+
 router.post(
   "/",
   authenticate,
@@ -37,7 +41,7 @@ router.get(
   "/me",
   authenticate,
   authorizeRoles("host", "showroom"),
-  carController.getMyCars
+  carController.deleteCar
 );
 
 

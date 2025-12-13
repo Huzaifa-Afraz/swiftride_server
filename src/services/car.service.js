@@ -1,33 +1,3 @@
-// import httpStatus from "http-status";
-// import { Car } from "../models/car.model.js";
-// import ApiError from "../utils/ApiError.js";
-
-// export const createCar = async (ownerId, payload, imageFiles = []) => {
-//   if (!ownerId) {
-//     throw new ApiError(httpStatus.UNAUTHORIZED, "Owner is required");
-//   }
-
-//   const images = (imageFiles || []).map((file) => ({
-//     path: file.path
-//   }));
-
-//   const car = await Car.create({
-//     owner: ownerId,
-//     title: payload.title,
-//     description: payload.description,
-//     brand: payload.brand,
-//     model: payload.model,
-//     year: payload.year,
-//     dailyPrice: payload.dailyPrice,
-//     location: payload.location,
-//     images,
-//     status: "active"
-//   });
-
-//   return car;
-// };
-import httpStatus from "http-status";
-import ApiError from "../utils/ApiError.js";
 import { Car } from "../models/car.model.js";
 import { USER_ROLE } from "../models/user.model.js";
 import mongoose from "mongoose";
@@ -37,10 +7,7 @@ const MAX_CARS_PER_USER = Number(process.env.MAX_CARS_PER_USER || 20);
 export const createCar = async (ownerId, ownerRole, payload) => {
   // 1. Role check
   if (![USER_ROLE.HOST, USER_ROLE.SHOWROOM].includes(ownerRole)) {
-    throw new ApiError(
-      httpStatus.FORBIDDEN,
-      "Only hosts or showrooms can list cars"
-    );
+    throw new ApiError(httpStatus.FORBIDDEN, "Only hosts or showrooms can list cars");
   }
 
   // 2. Per-user car limit
@@ -64,65 +31,60 @@ export const createCar = async (ownerId, ownerRole, payload) => {
   const car = await Car.create({
     ...payload,
     owner: ownerId,
-    ownerRole
+    ownerRole: ownerRole
   });
 
   return car;
 };
 
-
 export const getMyCars = async (ownerId) => {
-  return Car.find({ owner: ownerId }).sort({ createdAt: -1 });
+  return await Car.find({ owner: ownerId });
 };
 
-export const searchCars = async (filters, pagination) => {
-  const { page = 1, limit = 10 } = pagination;
+export const getCarById = async (id) => {
+  return await Car.findById(id).populate("owner", "fullName email");
+};
 
-  const query = { status: "active" };
+export const searchCars = async (query) => {
+  const { brand, minPrice, maxPrice } = query;
+  // Build your search logic here, e.g.:
+  const filter = {};
+  if (brand) filter.make = { $regex: brand, $options: "i" };
+  if (minPrice) filter.pricePerDay = { ...filter.pricePerDay, $gte: Number(minPrice) };
+  
+  return await Car.find(filter);
+};
 
-  if (filters.brand) {
-    query.brand = new RegExp(filters.brand, "i");
+export const updateCar = async (carId, userId, updateBody) => {
+  const car = await Car.findById(carId);
+  if (!car) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Car not found");
   }
 
-  if (filters.model) {
-    query.model = new RegExp(filters.model, "i");
+  // Security: Check ownership
+  if (car.owner.toString() !== userId) {
+    throw new ApiError(httpStatus.FORBIDDEN, "You are not authorized to update this car");
   }
 
-  if (filters.location) {
-    query.location = new RegExp(filters.location, "i");
+  // Update fields
+  Object.assign(car, updateBody);
+  await car.save();
+  return car;
+};
+
+// ✅ NEW: Delete Car
+export const deleteCar = async (carId, userId) => {
+  const car = await Car.findById(carId);
+  if (!car) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Car not found");
   }
 
-  if (filters.minYear || filters.maxYear) {
-    query.year = {};
-    if (filters.minYear) query.year.$gte = filters.minYear;
-    if (filters.maxYear) query.year.$lte = filters.maxYear;
+  if (car.owner.toString() !== userId) {
+    throw new ApiError(httpStatus.FORBIDDEN, "You are not authorized to delete this car");
   }
 
-  if (filters.minPrice || filters.maxPrice) {
-    query.dailyPrice = {};
-    if (filters.minPrice) query.dailyPrice.$gte = filters.minPrice;
-    if (filters.maxPrice) query.dailyPrice.$lte = filters.maxPrice;
-  }
-
-  const skip = (page - 1) * limit;
-
-  const [items, total] = await Promise.all([
-    Car.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit),
-    Car.countDocuments(query)
-  ]);
-
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    items,
-    page,
-    limit,
-    total,
-    totalPages
-  };
+  await Car.findByIdAndDelete(carId);
+  return car;
 };
 
 
