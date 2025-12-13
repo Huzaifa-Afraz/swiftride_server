@@ -41,9 +41,6 @@ export const getMyCars = async (ownerId) => {
   return await Car.find({ owner: ownerId });
 };
 
-export const getCarById = async (id) => {
-  return await Car.findById(id).populate("owner", "fullName email");
-};
 
 export const searchCars = async (query) => {
   const { brand, minPrice, maxPrice } = query;
