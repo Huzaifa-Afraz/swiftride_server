@@ -174,7 +174,7 @@ export const createBooking = async (customerId, payload) => {
   if (!customer || customer.role !== USER_ROLE.CUSTOMER)
     throw new ApiError(httpStatus.BAD_REQUEST, "Only customers can book cars");
 
-  if (!customer.isKycApproved)
+  if (!customer.isVerified)
     throw new ApiError(httpStatus.FORBIDDEN, "KYC must be approved");
 
   // self booking check
