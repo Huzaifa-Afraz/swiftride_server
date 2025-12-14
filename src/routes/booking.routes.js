@@ -21,7 +21,6 @@ router.post(
   "/",
   authenticate,
   authorizeRoles("customer"),
-  validate(createBookingSchema),
   bookingController.createBooking
 );
 
