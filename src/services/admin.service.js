@@ -134,7 +134,7 @@ export const getAdminUsers = async ({ role, page = 1, limit = 20 }) => {
       _id: user._id,
       email: user.email,
       status: user.status || "active", // default
-      isVerified: !!user.isKycApproved, // or user.kycStatus === "approved"
+      isVerified: !!user.isVerified, // or user.kycStatus === "approved"
       createdAt: user.createdAt,
     };
 
