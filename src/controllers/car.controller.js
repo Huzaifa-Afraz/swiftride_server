@@ -1,9 +1,7 @@
 import httpStatus from "http-status";
 import catchAsync from "../utils/catchAsync.js";
 import { sendSuccessResponse } from "../utils/response.js";
-import { Car } from "../models/car.model.js";
-import { USER_ROLE } from "../models/user.model.js";
-import ApiError from "../utils/ApiError.js";
+import * as carService from "../services/car.service.js";
 
 export const createCar = catchAsync(async (req, res) => {
   const ownerId = req.user.id;
@@ -97,6 +95,15 @@ export const createCar = catchAsync(async (req, res) => {
     car
   });
 });
+export const updateCar = catchAsync(async (req, res) => {
+  const { carId } = req.params;
+  const userId = req.user.id;
+  const updateBody = req.body;
+  const updatedCar = await carService.updateCar(carId, userId, updateBody);
+  sendSuccessResponse(res, httpStatus.OK, "Car updated successfully", {
+    car: updatedCar
+  });
+});
 
 export const getMyCars = catchAsync(async (req, res) => {
   const cars = await carService.getMyCars(req.user.id);
@@ -119,3 +126,11 @@ export const getCarById = catchAsync(async (req, res) => {
     car
   });
 });
+
+export const deleteCar = catchAsync(async (req, res) => {
+  const { carId } = req.params;
+  const userId = req.user.id;
+  await carService.deleteCar(carId, userId);
+  sendSuccessResponse(res, httpStatus.OK, "Car deleted successfully");
+}
+);
