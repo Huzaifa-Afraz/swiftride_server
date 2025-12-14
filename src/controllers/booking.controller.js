@@ -114,11 +114,11 @@ const mapBookingDetailForUser = (booking) => {
 
 export const updateBookingStatus = catchAsync(async (req, res) => {
   const ownerId = req.user.id;
-  const { bookingId } = req.params;
+  const { id } = req.params;
   const { status, note } = req.body;
 
   const booking = await bookingService.updateBookingStatus(
-    bookingId,
+    id,
     ownerId,
     status,
     note

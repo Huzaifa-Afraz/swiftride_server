@@ -436,6 +436,8 @@ export const updateBookingStatus = async (
   newStatus,
   note
 ) => {
+  console.log("Updating booking status:", { bookingId, ownerId, newStatus, note });
+  // return;
   const booking = await Booking.findById(bookingId)
     .populate("customer")
     .populate("car")
