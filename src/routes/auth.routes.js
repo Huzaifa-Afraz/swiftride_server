@@ -5,11 +5,11 @@ import {
   signupUserSchema,
   loginSchema,
   showroomSignupSchema,
-  googleLoginSchema
+  googleLoginSchema,
 } from "../validations/auth.validation.js";
 import {
   forgotPasswordSchema,
-  resetPasswordSchema
+  resetPasswordSchema,
 } from "../validations/password.validation.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 
@@ -29,7 +29,12 @@ router.post(
 );
 
 // Google auth (common entry point for all roles)
-router.post("/google", validate(googleLoginSchema), authController.googleLogin);
+// router.post("/google", validate(googleLoginSchema), authController.googleLogin);
+router.post(
+  "/google-login",
+  // validate(googleLoginSchema),
+  authController.googleLogin
+);
 router.post(
   "/forgot-password",
   validate(forgotPasswordSchema),

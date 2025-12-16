@@ -1,9 +1,15 @@
 import httpStatus from "http-status";
+import verifyGoogleToken from "../helpers/googleAuth.helper.js";
 import * as authService from "../services/auth.service.js";
 import catchAsync from "../utils/catchAsync.js";
 import { sendSuccessResponse } from "../utils/response.js";
 import { sendAdminNewUserEmail } from "../utils/email.js";
-import { requestPasswordReset, resetPasswordWithToken } from "../services/auth.service.js";
+import { User } from "../models/user.model.js";
+import jwt from "jsonwebtoken";
+import {
+  requestPasswordReset,
+  resetPasswordWithToken,
+} from "../services/auth.service.js";
 
 export const signupUser = catchAsync(async (req, res) => {
   const { fullName, email, phoneNumber, password, role } = req.body;
@@ -13,7 +19,7 @@ export const signupUser = catchAsync(async (req, res) => {
     email,
     phoneNumber,
     password,
-    role
+    role,
   });
 
   // Fire-and-forget admin email (do not break signup if email fails)
@@ -27,7 +33,7 @@ export const signupUser = catchAsync(async (req, res) => {
 
   sendSuccessResponse(res, httpStatus.CREATED, "User registered successfully", {
     user: result.user,
-    tokens: result.tokens
+    tokens: result.tokens,
   });
 });
 
@@ -38,17 +44,17 @@ export const loginUser = catchAsync(async (req, res) => {
   const result = await authService.loginUser(email, password);
   console.log("Setting cookie for user:", result.user._id);
   console.log("Token:", result.token);
-   res.cookie("token", result.token, {
+  res.cookie("token", result.token, {
     httpOnly: true,
-    secure: false,        // true on production/https
+    secure: false, // true on production/https
     sameSite: "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000,
-    path: "/"
+    path: "/",
   });
 
   sendSuccessResponse(res, httpStatus.OK, "Login successful", {
     user: result.user,
-    token: result.token
+    token: result.token,
   });
 });
 
@@ -58,7 +64,7 @@ export const signupShowroom = catchAsync(async (req, res) => {
   const result = await authService.signupShowroom({
     showroomName,
     email,
-    password
+    password,
   });
 
   (async () => {
@@ -75,35 +81,10 @@ export const signupShowroom = catchAsync(async (req, res) => {
     "Showroom registered successfully",
     {
       user: result.user,
-      tokens: result.tokens
+      tokens: result.tokens,
     }
   );
 });
-
-export const googleLogin = catchAsync(async (req, res) => {
-  const { idToken, role, showroomName } = req.body;
-
-  const result = await authService.googleLogin({ idToken, role, showroomName });
-
-  // If this is a newly-created user via Google, you can optionally notify admin
-  if (result.isNewUser) {
-    (async () => {
-      try {
-        await sendAdminNewUserEmail(result.user);
-      } catch (err) {
-        console.error("Error sending admin Google signup email:", err.message);
-      }
-    })();
-  }
-
-  sendSuccessResponse(res, httpStatus.OK, "Google login successful", {
-    user: result.user,
-    tokens: result.tokens
-  });
-});
-
-
-
 
 export const forgotPassword = catchAsync(async (req, res) => {
   const { email } = req.body;
@@ -136,12 +117,11 @@ export const logout = catchAsync(async (req, res) => {
     httpOnly: true,
     secure: false,
     sameSite: "lax",
-    path: "/"
+    path: "/",
   });
 
   return sendSuccessResponse(res, httpStatus.OK, "Logout successful");
 });
-
 
 export const getMe = catchAsync(async (req, res) => {
   const userId = req.user.id; // set by authenticate middleware
@@ -149,5 +129,51 @@ export const getMe = catchAsync(async (req, res) => {
   const user = await authService.getCurrentUser(userId);
 
   // Shape: { success, message, data: { user } }
-  sendSuccessResponse(res, httpStatus.OK, "Current user fetched",  user );
+  sendSuccessResponse(res, httpStatus.OK, "Current user fetched", user);
 });
+
+export const googleLogin = async (req, res, next) => {
+  try {
+    const { idToken, role } = req.body; // Role (customer/host) passed from frontend
+
+    if (!idToken) {
+      return res.status(400).json({ message: "Google Token is required" });
+    }
+
+    // 1. Verify Token
+    const googleUser = await verifyGoogleToken(idToken);
+    const { email, name, picture } = googleUser;
+
+    // 2. Check if user exists
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // 3. If no user, Create New User
+      user = await User.create({
+        name,
+        email,
+        profilePicture: picture,
+        role: role || "customer", // Default to customer if not specified
+        isVerified: true, // Google emails are verified
+        provider: "google",
+      });
+    }
+
+    // 4. Generate JWT (Same as your normal login)
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      token,
+      user,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
