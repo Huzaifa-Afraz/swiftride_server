@@ -16,11 +16,9 @@ const pushStatusHistory = (booking, status, changedBy, note) => {
     status,
     changedAt: new Date(),
     changedBy,
-    note
+    note,
   });
 };
-
-
 
 const calculateDays = (start, end) => {
   const ms = end.getTime() - start.getTime();
@@ -86,7 +84,6 @@ const calculateDays = (start, end) => {
 
 //   return booking;
 // };
-
 
 // export const createBooking = async (customerId, payload) => {
 //   const { carId, startDate, endDate } = payload;
@@ -216,7 +213,7 @@ export const createBooking = async (customerId, payload) => {
   //   invoiceNumber,
   //   status: "pending"
   // });
-    const start = new Date(startDateTime);
+  const start = new Date(startDateTime);
   const end = new Date(endDateTime);
 
   if (start >= end) {
@@ -228,13 +225,13 @@ export const createBooking = async (customerId, payload) => {
     const startDay = start.getDay(); // 0-6
     const endDay = end.getDay();
 
-    const daysAllowed = car.availability.daysOfWeek || [0,1,2,3,4,5,6];
-    if (!daysAllowed.includes(startDay) || !daysAllowed.includes(endDay)) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        "Car is not available on selected days"
-      );
-    }
+    const daysAllowed = car.availability.daysOfWeek || [0, 1, 2, 3, 4, 5, 6];
+    // if (!daysAllowed.includes(startDay) || !daysAllowed.includes(endDay)) {
+    //   throw new ApiError(
+    //     httpStatus.BAD_REQUEST,
+    //     "Car is not available on selected days"
+    //   );
+    // }
     // you can further check time within startTime/endTime if you want
   }
 
@@ -245,17 +242,12 @@ export const createBooking = async (customerId, payload) => {
     pricePerHour = car.pricePerDay / 24;
   }
   if (!pricePerHour) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Car has no pricing configured"
-    );
+    throw new ApiError(httpStatus.BAD_REQUEST, "Car has no pricing configured");
   }
 
   const totalPrice = pricePerHour * durationHours;
 
-  const invoiceNumber = `INV-${Date.now()}-${Math.floor(
-    Math.random() * 9999
-  )}`;
+  const invoiceNumber = `INV-${Date.now()}-${Math.floor(Math.random() * 9999)}`;
 
   const booking = await Booking.create({
     car: carId,
@@ -266,21 +258,18 @@ export const createBooking = async (customerId, payload) => {
     durationHours,
     totalPrice,
     invoiceNumber,
-    status: "pending"
+    status: "pending",
+    paymentStatus: "paid", // ✅ Changed from default "unpaid"
   });
 
-
-
   booking.statusHistory.push({
-  status: "pending",
-  changedAt: new Date(),
-  changedBy: customerId
-});
-await booking.save();
-return booking;
+    status: "pending",
+    changedAt: new Date(),
+    changedBy: customerId,
+  });
+  await booking.save();
+  return booking;
 };
-
-
 
 export const getCustomerBookings = async (customerId) => {
   return Booking.find({ customer: customerId })
@@ -314,8 +303,6 @@ export const getOwnerBookings = async (ownerId) => {
 //   return booking;
 // };
 
-
-
 // export const updateBookingStatus = async (bookingId, ownerId, newStatus) => {
 //   const booking = await Booking.findById(bookingId).populate("customer");
 //   if (!booking) {
@@ -343,8 +330,6 @@ export const getOwnerBookings = async (ownerId) => {
 //   booking.pdfPath = pdfPath;
 //   await booking.save();
 // }
-
-
 
 //   booking.status = newStatus;
 //   await booking.save();
@@ -436,7 +421,12 @@ export const updateBookingStatus = async (
   newStatus,
   note
 ) => {
-  console.log("Updating booking status:", { bookingId, ownerId, newStatus, note });
+  console.log("Updating booking status:", {
+    bookingId,
+    ownerId,
+    newStatus,
+    note,
+  });
   // return;
   const booking = await Booking.findById(bookingId)
     .populate("customer")
@@ -459,7 +449,7 @@ export const updateBookingStatus = async (
     "confirmed",
     "ongoing",
     "completed",
-    "cancelled"
+    "cancelled",
   ];
   if (!allowedStatuses.includes(newStatus)) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid status");
@@ -537,10 +527,6 @@ export const updateBookingStatus = async (
   return booking;
 };
 
-
-
-
-
 // export const extendBooking = async (bookingId, customerId, newEndTime) => {
 //   const booking = await Booking.findById(bookingId).populate("car");
 
@@ -587,8 +573,6 @@ export const updateBookingStatus = async (
 //   return booking;
 // };
 
-
-
 export const extendBooking = async (bookingId, customerId, newEndTime) => {
   const booking = await Booking.findById(bookingId).populate("car");
 
@@ -624,7 +608,7 @@ export const extendBooking = async (bookingId, customerId, newEndTime) => {
     oldEnd,
     newEnd,
     extraHours,
-    extraAmount
+    extraAmount,
   });
 
   booking.endDateTime = newEnd;
@@ -634,4 +618,3 @@ export const extendBooking = async (bookingId, customerId, newEndTime) => {
   await booking.save();
   return booking;
 };
-

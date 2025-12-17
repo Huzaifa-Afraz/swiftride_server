@@ -4,10 +4,13 @@
 // import { validate } from "../middlewares/validation.middleware.js";
 import {
   createBookingSchema,
-  updateBookingStatusSchema
+  updateBookingStatusSchema,
 } from "../validations/booking.validation.js";
 import express from "express";
-import { authenticate, authorizeRoles } from "../middlewares/auth.middleware.js";
+import {
+  authenticate,
+  authorizeRoles,
+} from "../middlewares/auth.middleware.js";
 import { requireKycApproved } from "../middlewares/kyc.middleware.js";
 import * as bookingController from "../controllers/booking.controller.js";
 import { validate } from "../middlewares/validation.middleware.js";
@@ -49,13 +52,13 @@ router.patch(
   bookingController.updateBookingStatus
 );
 
-
 // Customer creates booking
 router.post(
   "/",
   authenticate,
   authorizeRoles("customer"),
   requireKycApproved,
+  validate(createBookingSchema),
   bookingController.createBooking
 );
 
@@ -83,7 +86,6 @@ router.patch(
   bookingController.updateBookingStatus
 );
 
-
 router.patch(
   "/extend/:bookingId",
   authenticate,
@@ -91,7 +93,6 @@ router.patch(
   requireKycApproved,
   bookingController.extendBooking
 );
-
 
 router.get(
   "/invoice/:bookingId",
@@ -106,7 +107,5 @@ router.get(
   authorizeRoles("customer", "host", "showroom", "admin"),
   bookingController.getBookingDetailForUser
 );
-
-
 
 export default router;
