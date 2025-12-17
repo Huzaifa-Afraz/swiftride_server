@@ -29,29 +29,37 @@ export const sanitizeUser = (userDoc) => {
     role: u.role,
     status: u.status,
     isEmailVerified: !!u.isEmailVerified,
-    isVerified: !!u.isVerified,   // friendly flag
+    isVerified: !!u.isVerified, // friendly flag
     isKycApproved: !!u.isVerified, // legacy flag
     createdAt: u.createdAt,
-    updatedAt: u.updatedAt
+    updatedAt: u.updatedAt,
   };
 };
-
 
 export const generateAuthToken = (user) => {
   const payload = {
     sub: user._id,
-    role: user.role
+    role: user.role,
   };
 
   const token = jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || "7d"
+    expiresIn: process.env.JWT_EXPIRES_IN || "7d",
   });
 
   return { accessToken: token };
 };
 
-export const signupUser = async ({ fullName, email, phoneNumber, password, role }) => {
-  if (!role || ![USER_ROLE.CUSTOMER, USER_ROLE.HOST, USER_ROLE.BOTH].includes(role)) {
+export const signupUser = async ({
+  fullName,
+  email,
+  phoneNumber,
+  password,
+  role,
+}) => {
+  if (
+    !role ||
+    ![USER_ROLE.CUSTOMER, USER_ROLE.HOST, USER_ROLE.BOTH].includes(role)
+  ) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid role for user signup");
   }
 
@@ -67,7 +75,7 @@ export const signupUser = async ({ fullName, email, phoneNumber, password, role 
     email,
     phoneNumber,
     password: hashedPassword,
-    role
+    role,
   });
 
   return sanitizeUser(user);
@@ -89,8 +97,6 @@ export const signupUser = async ({ fullName, email, phoneNumber, password, role 
 //   return { user: sanitizeUser(user), tokens };
 // };
 
-
-
 export const loginUser = async (email, password) => {
   console.log("Attempting login for email:", email, password);
   // Same login for ALL roles
@@ -106,9 +112,15 @@ export const loginUser = async (email, password) => {
   }
 
   const tokens = generateAuthToken(user);
-  console.log("Login successful for user:", user._id, "Role:", user.role, tokens);
+  console.log(
+    "Login successful for user:",
+    user._id,
+    "Role:",
+    user.role,
+    tokens
+  );
 
-  return { user: sanitizeUser(user), token:tokens?.accessToken };
+  return { user: sanitizeUser(user), token: tokens?.accessToken };
 };
 
 export const signupShowroom = async ({ showroomName, email, password }) => {
@@ -123,7 +135,7 @@ export const signupShowroom = async ({ showroomName, email, password }) => {
     showroomName,
     email,
     password: hashedPassword,
-    role: USER_ROLE.SHOWROOM
+    role: USER_ROLE.SHOWROOM,
   });
 
   return sanitizeUser(showroomUser);
@@ -152,7 +164,7 @@ export const googleLogin = async ({ idToken, role, showroomName }) => {
 
   const ticket = await googleClient.verifyIdToken({
     idToken,
-    audience: process.env.GOOGLE_CLIENT_ID
+    audience: process.env.GOOGLE_CLIENT_ID,
   });
 
   const payload = ticket.getPayload();
@@ -178,11 +190,15 @@ export const googleLogin = async ({ idToken, role, showroomName }) => {
 
     user = await User.create({
       fullName: resolvedRole === USER_ROLE.SHOWROOM ? undefined : fullName,
-      showroomName: resolvedRole === USER_ROLE.SHOWROOM ? showroomName : undefined,
+      showroomName:
+        resolvedRole === USER_ROLE.SHOWROOM ? showroomName : undefined,
       email,
       role: resolvedRole,
       googleId,
-      isEmailVerified: payload.email_verified
+      // ✅ FIX IS HERE:
+      isEmailVerified: true, // Email IS verified (Google)
+      isVerified: false, // KYC is NOT verified (Critical Fix)
+      isKycApproved: false, // Legacy flag just in case
     });
   } else {
     // Link google id if missing
@@ -196,8 +212,6 @@ export const googleLogin = async ({ idToken, role, showroomName }) => {
 
   return { user: sanitizeUser(user), tokens };
 };
-
-
 
 export const requestPasswordReset = async (email) => {
   const user = await User.findOne({ email });
@@ -216,10 +230,7 @@ export const requestPasswordReset = async (email) => {
   // Generate random token
   const token = crypto.randomBytes(32).toString("hex");
 
-  const tokenHash = crypto
-    .createHash("sha256")
-    .update(token)
-    .digest("hex");
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
@@ -227,7 +238,7 @@ export const requestPasswordReset = async (email) => {
     user: user._id,
     tokenHash,
     expiresAt,
-    used: false
+    used: false,
   });
 
   // Send email with plain token
@@ -240,7 +251,7 @@ export const resetPasswordWithToken = async (token, newPassword) => {
   const resetDoc = await PasswordResetToken.findOne({
     tokenHash,
     used: false,
-    expiresAt: { $gt: new Date() }
+    expiresAt: { $gt: new Date() },
   });
 
   if (!resetDoc) {
@@ -265,9 +276,6 @@ export const resetPasswordWithToken = async (token, newPassword) => {
   return user;
 };
 
-
-
-
 // export const getCurrentUser = async (userId) => {
 //   const user = await User.findById(userId);
 
@@ -278,7 +286,6 @@ export const resetPasswordWithToken = async (token, newPassword) => {
 // console.log("Fetched user:", sanitizeUser(user));
 //   return sanitizeUser(user);
 // };
-
 
 export const getCurrentUser = async (userId) => {
   const user = await User.findById(userId);

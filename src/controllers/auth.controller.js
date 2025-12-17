@@ -132,6 +132,17 @@ export const getMe = catchAsync(async (req, res) => {
   sendSuccessResponse(res, httpStatus.OK, "Current user fetched", user);
 });
 
+// export const googleLogin = catchAsync(async (req, res) => {
+//   // We simply pass the request body to the service
+//   // The service handles the KYC logic (isVerified: false)
+//   const result = await authService.googleLogin(req.body);
+
+//   sendSuccessResponse(res, httpStatus.OK, "Google login successful", {
+//     user: result.user,
+//     token: result.tokens?.accessToken || result.tokens, // Handle token structure safely
+//   });
+// });
+
 export const googleLogin = async (req, res, next) => {
   try {
     const { idToken, role } = req.body; // Role (customer/host) passed from frontend
@@ -154,7 +165,7 @@ export const googleLogin = async (req, res, next) => {
         email,
         profilePicture: picture,
         role: role || "customer", // Default to customer if not specified
-        isVerified: true, // Google emails are verified
+        isVerified: false, // Google emails are verified
         provider: "google",
       });
     }
