@@ -481,13 +481,13 @@ export const updateBookingStatus = async (
   // }
 
   if (newStatus === "confirmed") {
-    if (booking.paymentStatus !== "paid") {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        "Booking payment is not completed. Cannot confirm booking."
-      );
-    }
-    if (!booking.customer.isKycApproved) {
+    // if (booking.paymentStatus !== "paid") {
+    //   throw new ApiError(
+    //     httpStatus.BAD_REQUEST,
+    //     "Booking payment is not completed. Cannot confirm booking."
+    //   );
+    // }
+    if (!booking.customer.isVerified) {
       throw new ApiError(
         httpStatus.FORBIDDEN,
         "Customer KYC is not approved. Cannot confirm booking."
