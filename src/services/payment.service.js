@@ -1,65 +1,54 @@
 import crypto from "crypto";
 import httpStatus from "http-status";
+import axios from "axios"; // You likely need axios to post the auth_token back to Easypaisa
 import ApiError from "../utils/ApiError.js";
 import { Booking } from "../models/booking.model.js";
 import * as walletService from "./wallet.service.js";
 
 const provider = process.env.PAYMENT_PROVIDER || "EASYPAISA";
 
-const baseUrl = process.env.EASYPAISA_BASE_URL;        // e.g. https://easypay.easypaisa.com.pk/easypay/
-const merchantId = process.env.EASYPAISA_MERCHANT_ID;
+// CONFIGURATION
+// Live URL: https://easypay.easypaisa.com.pk/easypay/
+// Sandbox URL: https://easypaystg.easypaisa.com.pk/easypay/
+const baseUrl = process.env.EASYPAISA_BASE_URL; 
 const storeId = process.env.EASYPAISA_STORE_ID;
-const hashKey = process.env.EASYPAISA_HASH_KEY;
-const returnUrl = process.env.EASYPAISA_RETURN_URL;    // front-end URL
-const callbackUrl = process.env.EASYPAISA_CALLBACK_URL; // backend URL
-const currency = process.env.EASYPAISA_CURRENCY || "PKR";
+const hashKey = process.env.EASYPAISA_HASH_KEY; // Must be the key from Telenor POC
+const returnUrl = process.env.EASYPAISA_RETURN_URL; // Your Frontend URL that receives the auth_token
 
 /**
- * Utility – generate hash/signature according to Easypaisa docs.
- * 
- * IMPORTANT:
- * ----------
- * This is a TEMPLATE. You MUST adjust this function to match the
- * exact algorithm and parameter order that Easypaisa gives you
- * in their merchant integration guide.
+ * Utility: AES Encryption for Easypaisa (Section 5 of Guide)
+ * 1. Sorts parameters alphabetically
+ * 2. Creates a query string
+ * 3. Encrypts using AES-128-ECB
  */
 const generateEasypaisaHash = (params) => {
-  // EXAMPLE approach:
-  // 1) Take specific fields in a fixed order (e.g. merchantId, storeId, amount, orderRefNum, returnUrl, callbackUrl)
-  // 2) Concatenate with '&' or '~' (whatever Easypaisa requires)
-  // 3) Apply HMAC-SHA256 or SHA256 with your hashKey
+  // 1. Filter empty/null and exclude the hash field itself
+  const sortedKeys = Object.keys(params)
+    .filter((key) => key !== "merchantHashedReq" && params[key] !== undefined && params[key] !== "")
+    .sort();
 
-  // TODO: Replace this logic with EXACT method from Easypaisa docs
-  const fieldOrder = [
-    "merchantId",
-    "storeId",
-    "amount",
-    "currency",
-    "orderRefNum",
-    "returnUrl",
-    "callbackUrl"
-  ];
+  // 2. Create string: key1=val1&key2=val2...
+  const dataString = sortedKeys.map((key) => `${key}=${params[key]}`).join("&");
 
-  const concat = fieldOrder
-    .map((key) => params[key])
-    .filter((v) => v !== undefined && v !== null)
-    .join("&");
+  // 3. Encrypt
+  // Easypaisa uses AES-128-ECB. Ensure your hashKey is correct.
+  const keyBuffer = Buffer.from(hashKey, "utf-8");
+  const cipher = crypto.createCipheriv("aes-128-ecb", keyBuffer, null);
+  cipher.setAutoPadding(true); // PKCS5Padding
 
-  return crypto.createHmac("sha256", hashKey).update(concat).digest("hex");
+  let encrypted = cipher.update(dataString, "utf8", "base64");
+  encrypted += cipher.final("base64");
+
+  return encrypted;
 };
 
 /**
- * INIT PAYMENT – Called by customer to start paying for a booking.
- * Returns:
- *  - paymentPageUrl (Easypaisa URL)
- *  - payload (fields to POST to Easypaisa)
+ * INIT PAYMENT
+ * Prepares the payload for the frontend to submit to Easypaisa.
  */
 export const initBookingPayment = async (bookingId, customerId) => {
   if (provider !== "EASYPAISA") {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Unsupported payment provider configured"
-    );
+    throw new ApiError(httpStatus.BAD_REQUEST, "Unsupported payment provider configured");
   }
 
   const booking = await Booking.findById(bookingId).populate("customer");
@@ -68,112 +57,134 @@ export const initBookingPayment = async (bookingId, customerId) => {
   }
 
   if (booking.customer._id.toString() !== customerId.toString()) {
-    throw new ApiError(
-      httpStatus.FORBIDDEN,
-      "You can only pay for your own bookings"
-    );
+    throw new ApiError(httpStatus.FORBIDDEN, "You can only pay for your own bookings");
   }
 
   if (booking.paymentStatus === "paid") {
     throw new ApiError(httpStatus.BAD_REQUEST, "Booking already paid");
   }
 
-  const amount = Math.round(booking.totalPrice); // integer PKR
+  // Easypaisa requires amount with 1 decimal place (e.g., "10.0") [cite: 472]
+  const amount = parseFloat(booking.totalPrice).toFixed(1);
   const orderRefNum = booking.invoiceNumber || booking._id.toString();
+  
+  // Date format: YYYYMMDD HHMMSS (Optional but good for security)
+  const now = new Date();
+  const expiryDate = now.toISOString().replace(/[-:T]/g, "").slice(0, 14); 
 
-  // Build Easypaisa request payload based on their docs
-  // TODO: Rename / adjust fields to match Easypaisa exact names
+  // STRICT PARAMETERS based on Guide Section 2.2
   const params = {
-    merchantId,
-    storeId,
-    amount,
-    currency,
-    orderRefNum,
-    description: `Booking ${booking._id} - ${booking.invoiceNumber}`,
-    returnUrl,
-    callbackUrl
+    storeId: storeId,
+    amount: amount,
+    postBackURL: returnUrl, // Frontend URL
+    orderRefNum: orderRefNum,
+    expiryDate: expiryDate,
+    autoRedirect: "1", // 1 = Redirect back to merchant automatically
+    paymentMethod: "MA_PAYMENT_METHOD", // Starts flow with Mobile Account (optional)
+    // emailAddr: booking.customer.email, // Optional
+    // mobileNum: booking.customer.phoneNumber // Optional
   };
 
-  const hash = generateEasypaisaHash(params);
-  const payload = { ...params, hash };
+  // Generate the hash
+  params.merchantHashedReq = generateEasypaisaHash(params);
 
   booking.paymentStatus = "processing";
   await booking.save();
 
   return {
     provider: "EASYPAISA",
-    paymentPageUrl: baseUrl, // Frontend will POST this payload to this URL
-    payload
+    paymentPageUrl: `${baseUrl}Index.jsf`, // The URL to POST the form to
+    payload: params,
   };
 };
 
 /**
- * CALLBACK – Easypaisa notifies us about payment result.
- * 
- * 'data' will be req.body / req.query depending on their integration style.
+ * VERIFY PAYMENT (The Handshake)
+ * 1. Receives auth_token from frontend.
+ * 2. POSTs auth_token back to Easypaisa to confirm status.
  */
-export const handleEasypaisaCallback = async (data) => {
-  // TODO: Map these according to Easypaisa docs.
-  // Typical fields might be:
-  // orderRefNum, transactionId, amount, responseCode, hash, currency
-
-  const orderRefNum = data.orderRefNum;
-  const transactionId = data.transactionId;
-  const responseCode = data.responseCode;
-  const receivedHash = data.hash;
-
-  const paramsForHash = {
-    merchantId,
-    storeId,
-    amount: data.amount,
-    currency: data.currency,
-    orderRefNum,
-    returnUrl,
-    callbackUrl
-  };
-
-  const calculatedHash = generateEasypaisaHash(paramsForHash);
-
-  if (calculatedHash !== receivedHash) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Invalid payment signature from Easypaisa"
-    );
+export const verifyEasypaisaPayment = async (authToken) => {
+  if (!authToken) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Missing auth_token");
   }
 
-  // Find booking using the same reference you sent (invoiceNumber / _id)
+  // The guide requires posting 'auth_token' and 'postBackURL' to Confirm.jsf [cite: 498-500]
+  const confirmUrl = `${baseUrl}Confirm.jsf`;
+  
+  // We must send the EXACT same postBackURL used in init
+  const payload = new URLSearchParams();
+  payload.append("auth_token", authToken);
+  payload.append("postBackURL", returnUrl);
+
+  try {
+    // Perform the handshake
+    const response = await axios.post(confirmUrl, payload);
+    
+    // Easypaisa returns a redirect/response. We usually parse the query parameters from the final URL 
+    // or the response body if it's a direct API call.
+    // However, usually Confirm.jsf redirects the USER. 
+    // IF we are doing this server-to-server, we might get the HTML response or a redirect.
+    
+    // ALTERNATIVE: If your frontend is handling the redirect from Confirm.jsf, 
+    // then *this* function is actually just an IPN handler or a final check.
+    
+    // BUT, assuming we want to check status manually or via IPN:
+    // Let's assume this function is called when the user lands on Frontend with ?status=Success (Insecure)
+    // OR we use the IPN flow.
+    
+    // SAFEST APPROACH (Double Check):
+    // Since we cannot easily scrape the Confirm.jsf response (it returns HTML), 
+    // we should rely on the query params the user brought back if we trust the hash (which we can't fully here).
+    // OR use the "Inquire Transaction" API [cite: 309] if you have credentials for it.
+    
+    // FOR NOW, let's assume we are parsing the data provided by the frontend 
+    // which extracted it from the URL after the SECOND redirect.
+    // If you strictly need to verify, you MUST use the "Inquire Transaction" SOAP API.
+    
+    return { status: "PENDING_VERIFICATION" }; 
+  } catch (error) {
+    console.error("Easypaisa Verification Error:", error.message);
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, "Payment verification failed");
+  }
+};
+
+/**
+ * HANDLE IPN / CALLBACK
+ * This is the most reliable way to mark as paid.
+ * Receives data from Easypaisa server directly.
+ */
+export const handleEasypaisaCallback = async (queryData) => {
+  // Configured IPN attributes usually include: 
+  // order_id, transaction_status, transaction_id, etc.
+  
+  // Note: Easypaisa IPN params might differ from your variable names. 
+  // Adjust 'transaction_status' based on your actual IPN configuration in the portal.
+  const { order_id, transaction_status, transaction_id } = queryData;
+
   const booking = await Booking.findOne({
-    $or: [{ invoiceNumber: orderRefNum }, { _id: orderRefNum }]
+    $or: [{ invoiceNumber: order_id }, { _id: order_id }],
   });
 
   if (!booking) {
-    throw new ApiError(httpStatus.NOT_FOUND, "Booking not found for payment");
+    throw new ApiError(httpStatus.NOT_FOUND, "Booking not found for payment callback");
   }
 
-  // TODO: Confirm from docs what responseCode means success
-  const isSuccess = responseCode === "0000" || responseCode === "00";
+  const isSuccess = transaction_status === "PAID" || transaction_status === "Success";
 
-  // if (isSuccess) {
-  //   booking.paymentStatus = "paid";
-  //   booking.paymentReference = transactionId;
-  // } else {
-  //   booking.paymentStatus = "failed";
-  //   booking.paymentReference = transactionId;
-  // }
   if (isSuccess) {
-  booking.paymentStatus = "paid";
-  booking.paymentReference = transactionId;
-  await booking.save();
+    if (booking.paymentStatus !== "paid") {
+      booking.paymentStatus = "paid";
+      booking.paymentReference = transaction_id;
+      await booking.save();
 
-  // ADD THIS:
-  await walletService.createBookingEarning(booking);
-} else {
-  booking.paymentStatus = "failed";
-  booking.paymentReference = transactionId;
-  await booking.save();
-}
-
-  await booking.save();
+      // Distribute earnings
+      await walletService.createBookingEarning(booking);
+    }
+  } else {
+    booking.paymentStatus = "failed";
+    booking.paymentReference = transaction_id || "FAILED";
+    await booking.save();
+  }
 
   return { booking, isSuccess };
 };

@@ -166,6 +166,7 @@ export const googleLogin = async (req, res, next) => {
         profilePicture: picture,
         role: role || "customer", // Default to customer if not specified
         isVerified: false, // Google emails are verified
+        isEmailVerified: true,
         provider: "google",
       });
     }
