@@ -113,7 +113,7 @@ export const resetPassword = catchAsync(async (req, res) => {
 });
 
 export const logout = catchAsync(async (req, res) => {
-  res.clearCookie("token", {
+  res.clearCookie("accessToken", {
     httpOnly: true,
     secure: false,
     sameSite: "lax",
@@ -171,19 +171,42 @@ export const googleLogin = async (req, res, next) => {
     }
 
     // 4. Generate JWT (Same as your normal login)
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "7d",
-      }
-    );
+    // const token = jwt.sign(
+    //   { id: user._id, role: user.role },
+    //   process.env.JWT_SECRET,
+    //   {
+    //     expiresIn: "7d",
+    //   }
+    // );
 
-    res.status(200).json({
-      success: true,
-      token,
-      user,
-    });
+    const token = authService.generateAuthToken(user);
+    
+    // res.cookie("token", token, {
+    //   httpOnly: true,
+    //   secure: false, // true on production/https
+    //   sameSite: "lax",
+    //   maxAge: 7 * 24 * 60 * 60 * 1000,  
+    // });
+
+    // res.status(200).json({
+    //   success: true,
+    //   token,
+    //   user,
+    // });
+
+
+      res.cookie("token", token?.accessToken, {
+    httpOnly: true,
+    secure: false, 
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/",
+  });
+
+  sendSuccessResponse(res, httpStatus.OK, "Login successful", {
+    user: user,
+    token: token?.accessToken,
+  });
   } catch (error) {
     next(error);
   }
