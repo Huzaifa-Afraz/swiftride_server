@@ -88,6 +88,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(morgan("dev"));
 
+
+// Serve uploaded files as static assets
+app.use('/uploads', express.static('uploads'));
+
 // 3. ADD DB CONNECTION MIDDLEWARE (The Magic Part)
 // This ensures every request to Vercel checks if DB is connected
 app.use(async (req, res, next) => {
