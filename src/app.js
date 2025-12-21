@@ -13,6 +13,7 @@ import { notFoundHandler, errorHandler } from "./middlewares/error.middleware.js
 import connectDB from "./config/db.js"; 
 
 const app = express();
+app.set("trust proxy", 1);
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -34,6 +35,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions)); // IMPORTANT
+
 
 
 // Regular Middleware

@@ -46,8 +46,8 @@ export const loginUser = catchAsync(async (req, res) => {
   console.log("Token:", result.token);
   res.cookie("token", result.token, {
     httpOnly: true,
-    secure: false, // true on production/https
-    sameSite: "lax",
+    secure: true, 
+    sameSite: "none",
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: "/",
   });
@@ -198,8 +198,8 @@ export const googleLogin = async (req, res, next) => {
 
       res.cookie("token", token?.accessToken, {
     httpOnly: true,
-    secure: false, 
-    sameSite: "lax",
+    secure: true, 
+    sameSite: "true",
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: "/",
   });
