@@ -58,6 +58,8 @@ export const initSafepayPayment = catchAsync(async (req, res) => {
   const { bookingId } = req.params;
   const userId = req.user.id; // From auth middleware
 
+  console.log("getting request: ", bookingId, " ", userId)
+
   const result = await safepayService.initSafepayPayment(bookingId, userId);
 
   sendSuccessResponse(

@@ -7,7 +7,7 @@ import * as walletService from "./wallet.service.js";
 // Initialize SDK
 // Change environment to 'production' when going live
 const safepay = new Safepay({
-  environment: process.env.NODE_ENV === "production" ? "production" : "sandbox",
+  environment:"sandbox",
   apiKey: process.env.SAFEPAY_API_KEY,
   v1Secret: process.env.SAFEPAY_V1_SECRET,
   webhookSecret: process.env.SAFEPAY_WEBHOOK_SECRET,
@@ -34,6 +34,14 @@ export const initSafepayPayment = async (bookingId, userId) => {
   if (booking.paymentStatus === "paid") {
     throw new ApiError(httpStatus.BAD_REQUEST, "Booking is already paid");
   }
+
+
+  console.log("bookigns details checked")
+  console.log("frontend url is: ", process.env.FRONTEND_URL)
+  console.log("safepay SAFEPAY_API_KEY ", process.env.SAFEPAY_API_KEY);
+  console.log("safepay SAFEPAY_V1_SECRET", process.env.SAFEPAY_V1_SECRET)
+  console.log("safepay webhook", process.env.SAFEPAY_WEBHOOK_SECRET)
+
 
   // 1. Create Payment Tracker (Session)
   const { token } = await safepay.payments.create({
