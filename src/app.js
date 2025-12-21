@@ -35,6 +35,10 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions)); // IMPORTANT
+app.use((req, res, next) => {
+  res.setHeader("X-From-App", "swiftride-express");
+  next();
+});
 
 
 
@@ -46,16 +50,19 @@ app.use(cookieParser());
 app.use(morgan("dev"));
 
 // Serve uploaded files as static assets
-app.use('/uploads', express.static('uploads'));
+// app.use('/uploads', express.static('uploads'));
 
 // 3. ADD DB CONNECTION MIDDLEWARE
 app.use(async (req, res, next) => {
-  // Optimization: Skip DB connection for OPTIONS requests (since we handled them above)
   if (req.method === "OPTIONS") return next();
-  
-  await connectDB();
-  next();
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    next(err);
+  }
 });
+
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "swiftride-api 0.0.0" });
