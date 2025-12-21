@@ -17,28 +17,24 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
-  "https://swiftride-frontend.vercel.app"
+  "https://swiftride-frontend.vercel.app",
 ];
 
 const corsOptions = {
-  origin: '*',
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true); // allow no-origin (curl, server-to-server)
+    return allowedOrigins.includes(origin)
+      ? cb(null, true)
+      : cb(new Error("Not allowed by CORS"), false);
+  },
   credentials: true,
+  methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"]
 };
 
-// 1. APPLY CORS MIDDLEWARE
 app.use(cors(corsOptions));
+app.options("*", cors(corsOptions)); // IMPORTANT
 
-// 2. THE NUCLEAR FIX (Add this block exactly here)
-// This forces Express to send "200 OK" for ANY 'OPTIONS' request immediately.
-// It stops the request here so it NEVER reaches your auth middleware.
-app.use((req, res, next) => {
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-  next();
-});
 
 // Regular Middleware
 app.use(helmet());
