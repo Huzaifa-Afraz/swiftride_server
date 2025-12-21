@@ -5,6 +5,9 @@ import { User } from "../models/user.model.js";
 
 export const authenticate = async (req, res, next) => {
   try {
+    if (req.method === "OPTIONS") {
+    return next();
+  }
     // 1) Get token from cookie OR Authorization header
     const cookieToken = req.cookies?.token;
     // console.log("Cookie token:", cookieToken);
