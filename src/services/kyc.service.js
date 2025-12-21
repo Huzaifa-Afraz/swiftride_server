@@ -5,7 +5,7 @@ import ApiError from "../utils/ApiError.js";
 
 export const submitUserKyc = async (
   userId,
-  { idFrontFile, idBackFile, liveSelfieFile, drivingLicenseFile }
+  { idFront, idBack, liveSelfie, drivingLicense }
 ) => {
   const user = await User.findById(userId);
   if (!user) {
@@ -18,15 +18,16 @@ export const submitUserKyc = async (
       "Only customer or host can submit individual KYC"
     );
   }
+  console.log(idFront, idBack, liveSelfie, drivingLicense);
 
-  if (!idFrontFile || !idBackFile || !liveSelfieFile) {
+  if (!idFront || !idBack || !liveSelfie) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
       "All common KYC images are required"
     );
   }
 
-  if (user.role === USER_ROLE.CUSTOMER && !drivingLicenseFile) {
+  if (user.role === USER_ROLE.CUSTOMER && !drivingLicense) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
       "Driving license is required for customers"
@@ -36,10 +37,10 @@ export const submitUserKyc = async (
   const payload = {
     user: userId,
     type: "individual",
-    idFrontPath: idFrontFile.path,
-    idBackPath: idBackFile.path,
-    liveSelfiePath: liveSelfieFile.path,
-    drivingLicensePath: drivingLicenseFile?.path,
+    idFrontPath: idFront,
+    idBackPath: idBack,
+    liveSelfiePath: liveSelfie,
+    drivingLicensePath: drivingLicense,
     status: "pending"
   };
 
@@ -58,12 +59,12 @@ export const submitUserKyc = async (
 export const submitShowroomKyc = async (
   userId,
   {
-    idFrontFile,
-    idBackFile,
-    liveSelfieFile,
-    registrationCertFile,
-    taxCertFile,
-    otherDocFile
+    idFront,
+    idBack,
+    liveSelfie,
+    registrationCert,
+    taxCert,
+    otherDoc
   }
 ) => {
   const user = await User.findById(userId);
@@ -78,7 +79,7 @@ export const submitShowroomKyc = async (
     );
   }
 
-  if (!idFrontFile || !idBackFile || !liveSelfieFile || !registrationCertFile) {
+  if (!idFront || !idBack || !liveSelfie || !registrationCert) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
       "Required showroom KYC documents are missing"
@@ -88,13 +89,13 @@ export const submitShowroomKyc = async (
   const payload = {
     user: userId,
     type: "showroom",
-    idFrontPath: idFrontFile.path,
-    idBackPath: idBackFile.path,
-    liveSelfiePath: liveSelfieFile.path,
+    idFrontPath: idFront,
+    idBackPath: idBack,
+    liveSelfiePath: liveSelfie,
     showroomDocs: {
-      registrationCertPath: registrationCertFile.path,
-      taxCertPath: taxCertFile?.path,
-      otherDocPath: otherDocFile?.path
+      registrationCertPath: registrationCert,
+      taxCertPath: taxCert,
+      otherDocPath: otherDoc
     },
     status: "pending"
   };

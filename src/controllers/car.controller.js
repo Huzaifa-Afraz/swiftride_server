@@ -2,6 +2,7 @@ import httpStatus from "http-status";
 import catchAsync from "../utils/catchAsync.js";
 import { sendSuccessResponse } from "../utils/response.js";
 import * as carService from "../services/car.service.js";
+import { uploadToCloudinary } from "../utils/cloudinary.js"; // 1. Import Helper
 
 export const createCar = catchAsync(async (req, res) => {
   const ownerId = req.user.id;
@@ -10,17 +11,32 @@ export const createCar = catchAsync(async (req, res) => {
   const payload = req.body;
 
   // Handle multer files:
-  // If using .fields(), req.files.photos will be an array
-  const rawFiles = Array.isArray(req.files)
-    ? req.files
-    : req.files?.photos || [];
-
-  // Map to relative paths to store in DB
-  const photos = rawFiles.map((f) => `/uploads/cars/${f.filename}`);
+  // If using .fields(), req.files.photos might be the key
+  // Or if using .array('photos'), req.files is the array directly
+  // This logic handles both cases safely:
+  let rawFiles = [];
+  if (Array.isArray(req.files)) {
+    rawFiles = req.files;
+  } else if (req.files && req.files.photos) {
+    rawFiles = req.files.photos;
+  }
 
   console.log("Creating car with payload:", payload);
-  console.log("Uploaded files:", rawFiles);
+  console.log(`Uploading ${rawFiles.length} photos to Cloudinary...`);
 
+  // 2. Upload photos to Cloudinary (Parallel)
+  // We map the files to promises, then wait for all of them to finish.
+  // The helper returns the Secure URL (string).
+  const photos = await Promise.all(
+    rawFiles.map((file) => uploadToCloudinary(file.buffer, "car_photos"))
+  );
+
+
+
+  // console.log(photos)
+  const photoUrls = photos.map(result => result.secure_url);
+  console.log(photoUrls)
+  // return;
   // Convert flat form-data into car schema shape
   const carInput = {
     make: payload.make,
@@ -40,7 +56,8 @@ export const createCar = catchAsync(async (req, res) => {
     transmission: payload.transmission,
     fuelType: payload.fuelType,
 
-    photos,
+    // 3. Assign the Cloudinary URLs here
+    photos: photoUrls,
 
     location: {
       address: payload.locationAddress,
@@ -64,7 +81,6 @@ export const createCar = catchAsync(async (req, res) => {
         payload.availabilityIsAvailable === 1,
       daysOfWeek: (() => {
         if (!payload.availabilityDaysOfWeek) return [0, 1, 2, 3, 4, 5, 6];
-        // You’re sending "[1,2,3,4,5]" as string – parse JSON safely
         try {
           const parsed = JSON.parse(payload.availabilityDaysOfWeek);
           return Array.isArray(parsed) ? parsed : [0, 1, 2, 3, 4, 5, 6];
@@ -76,14 +92,12 @@ export const createCar = catchAsync(async (req, res) => {
 
     features: (() => {
       if (!payload.features) return [];
-      // If frontend sends a comma-separated string
       if (typeof payload.features === "string") {
         return payload.features
           .split(",")
           .map((f) => f.trim())
           .filter(Boolean);
       }
-      // If it comes as array from form-data
       if (Array.isArray(payload.features)) return payload.features;
       return [];
     })()
@@ -95,6 +109,7 @@ export const createCar = catchAsync(async (req, res) => {
     car
   });
 });
+
 export const updateCar = catchAsync(async (req, res) => {
   const { carId } = req.params;
   const userId = req.user.id;
@@ -115,13 +130,9 @@ export const searchCars = catchAsync(async (req, res) => {
   sendSuccessResponse(res, httpStatus.OK, "Cars fetched successfully", result);
 });
 
-
-
 export const getCarById = catchAsync(async (req, res) => {
   const { carId } = req.params;
-
   const car = await carService.getCarById(carId);
-
   sendSuccessResponse(res, httpStatus.OK, "Car detail fetched successfully", {
     car
   });
@@ -132,5 +143,4 @@ export const deleteCar = catchAsync(async (req, res) => {
   const userId = req.user.id;
   await carService.deleteCar(carId, userId);
   sendSuccessResponse(res, httpStatus.OK, "Car deleted successfully");
-}
-);
+});
