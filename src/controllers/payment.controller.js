@@ -2,7 +2,7 @@ import httpStatus from "http-status";
 import catchAsync from "../utils/catchAsync.js";
 import { sendSuccessResponse } from "../utils/response.js";
 import * as paymentService from "../services/payment.service.js";
-
+import * as safepayService from "../services/safepay.service.js";
 // Init Payment
 export const initBookingPayment = catchAsync(async (req, res) => {
   const { bookingId } = req.params;
@@ -50,4 +50,33 @@ export const easypaisaCallback = catchAsync(async (req, res) => {
   } else {
     return res.status(200).send("FAILED");
   }
+});
+
+
+// SAFEPAY: Init
+export const initSafepayPayment = catchAsync(async (req, res) => {
+  const { bookingId } = req.params;
+  const userId = req.user.id; // From auth middleware
+
+  const result = await safepayService.initSafepayPayment(bookingId, userId);
+
+  sendSuccessResponse(
+    res,
+    httpStatus.OK,
+    "Safepay session created successfully",
+    result
+  );
+});
+
+// SAFEPAY: Webhook
+export const safepayWebhook = catchAsync(async (req, res) => {
+console.log("===================================");
+console.log("🔥 WEBHOOK RECEIVED!");
+console.log("Headers:", req.headers); // Check if x-sfpy-signature exists
+console.log("Body:", req.body);       // Check if data is correct
+console.log("===================================");
+  await safepayService.handleSafepayWebhook(req);
+
+  // Always return 200 to Safepay so they stop retrying
+  res.status(200).send("Webhook received");
 });

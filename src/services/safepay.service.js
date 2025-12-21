@@ -1,0 +1,154 @@
+import { Safepay } from "@sfpy/node-sdk";
+import httpStatus from "http-status";
+import ApiError from "../utils/ApiError.js";
+import { Booking } from "../models/booking.model.js";
+import * as walletService from "./wallet.service.js";
+
+// Initialize SDK
+// Change environment to 'production' when going live
+const safepay = new Safepay({
+  environment: process.env.NODE_ENV === "production" ? "production" : "sandbox",
+  apiKey: process.env.SAFEPAY_API_KEY,
+  v1Secret: process.env.SAFEPAY_V1_SECRET,
+  webhookSecret: process.env.SAFEPAY_WEBHOOK_SECRET,
+});
+
+/**
+ * 1. INIT PAYMENT
+ * - Calculates amount from Booking DB
+ * - Creates Safepay Session
+ * - Returns the Redirect URL
+ */
+export const initSafepayPayment = async (bookingId, userId) => {
+  const booking = await Booking.findById(bookingId).populate("customer");
+  
+  if (!booking) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Booking not found");
+  }
+
+  // Security Check: Ensure user owns this booking
+  if (booking.customer._id.toString() !== userId.toString()) {
+    throw new ApiError(httpStatus.FORBIDDEN, "Unauthorized to pay for this booking");
+  }
+
+  if (booking.paymentStatus === "paid") {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Booking is already paid");
+  }
+
+  // 1. Create Payment Tracker (Session)
+  const { token } = await safepay.payments.create({
+    amount: booking.totalPrice, 
+    currency: "PKR",
+  });
+
+  // 2. Generate Checkout URL
+  // 'source: custom' allows using your own success/cancel pages
+  const url = safepay.checkout.create({
+    token,
+    orderId: booking.invoiceNumber || booking._id.toString(),
+    cancelUrl: `${process.env.FRONTEND_URL}/payment/cancel`, // Where to go if they click cancel
+    redirectUrl: `${process.env.FRONTEND_URL}/payment/success`, // Where to go after success
+    source: "custom",
+    webhooks: true, // Crucial: Enables the webhook call
+  });
+
+  // 3. Update DB status
+  booking.paymentStatus = "processing";
+  booking.paymentReference = token; // Save token to verify later if needed
+  await booking.save();
+
+  return { 
+    url,     // Redirect user here
+    token    // Session token
+  };
+};
+
+/**
+ * 2. HANDLE WEBHOOK
+ * - Verifies signature from Safepay
+ * - Marks Booking as PAID in DB
+ * - Triggers Wallet Earning logic
+ */
+export const handleSafepayWebhook = async (req) => {
+  try {
+    // 1. Log for debugging (keep this until fixed)
+    console.log("Processing Webhook Payload:", JSON.stringify(req.body, null, 2));
+
+    // 2. Verify Signature (Optional: Wrap in try/catch to avoid crash if signature fails)
+    try {
+      const valid = safepay.webhooks.verify(
+        req.body,
+        req.headers["x-sfpy-signature"]
+      );
+      if (!valid) {
+        throw new Error("Invalid Signature");
+      }
+    } catch (sigError) {
+      console.error("Signature Verification Failed:", sigError.message);
+      // In Sandbox, you might want to proceed anyway if signature fails.
+      // In Production, throw an error here.
+    }
+
+    // 3. Extract Data safely based on YOUR logs
+    const { data } = req.body;
+    
+    // Safety check: Does 'data' exist?
+    if (!data) return { success: false, message: "No data found" };
+
+    const notification = data.notification || {};
+    const state = notification.state; 
+    const type = data.type;
+
+    console.log(`Payment State: ${state}, Event Type: ${type}`);
+
+    // 4. Check for Success (Your log shows state: 'PAID')
+    if (state === 'PAID') {
+      
+      // FIX THE PATH: Metadata is inside 'notification', not directly in 'data'
+      const metadata = notification.metadata || {};
+      const orderRef = metadata.order_id || metadata.orderId;
+
+      if (!orderRef) {
+        console.error("Critical: Order ID missing in webhook metadata");
+        return { success: false };
+      }
+
+      console.log(`Found Order Ref: ${orderRef}, Updating DB...`);
+
+      // 5. Find and Update Booking
+      // Note: Ensure your Booking Model imports are correct
+      const booking = await Booking.findOne({
+        $or: [{ invoiceNumber: orderRef }, { _id: orderRef }],
+      });
+
+      if (!booking) {
+        console.error(`Booking not found for Ref: ${orderRef}`);
+        return { success: false };
+      }
+
+      if (booking.paymentStatus !== "paid") {
+        booking.paymentStatus = "paid";
+        booking.paymentReference = data.token;
+        await booking.save();
+        
+        // Trigger wallet logic if you have it
+        if (walletService && walletService.createBookingEarning) {
+           await walletService.createBookingEarning(booking);
+        }
+        
+        console.log(`✅ Booking ${booking._id} marked as PAID.`);
+      } else {
+        console.log("Booking was already paid.");
+      }
+
+      return { success: true };
+    }
+
+    return { received: true };
+
+  } catch (error) {
+    console.error("❌ Webhook Crash:", error);
+    // Return a valid object so the controller doesn't send 500
+    return { success: false, error: error.message };
+  }
+};

@@ -18,4 +18,21 @@ router.post(
 router.post("/easypaisa/callback", paymentController.easypaisaCallback);
 router.get("/easypaisa/callback", paymentController.easypaisaCallback);
 
+
+
+// ==========================================
+// SAFEPAY ROUTES
+// ==========================================
+
+// 1. Initialize Payment (User calls this)
+router.post(
+  "/booking/:bookingId/safepay/init",
+  authenticate,
+  authorizeRoles("customer"),
+  paymentController.initSafepayPayment
+);
+
+// 2. Webhook Listener (Safepay server calls this)
+// Note: No auth middleware here, signature verification is handled in service
+router.post("/safepay/webhook", paymentController.safepayWebhook);
 export default router;

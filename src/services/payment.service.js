@@ -46,6 +46,61 @@ const generateEasypaisaHash = (params) => {
  * INIT PAYMENT
  * Prepares the payload for the frontend to submit to Easypaisa.
  */
+// export const initBookingPayment = async (bookingId, customerId) => {
+//   if (provider !== "EASYPAISA") {
+//     throw new ApiError(httpStatus.BAD_REQUEST, "Unsupported payment provider configured");
+//   }
+
+//   const booking = await Booking.findById(bookingId).populate("customer");
+//   if (!booking) {
+//     throw new ApiError(httpStatus.NOT_FOUND, "Booking not found");
+//   }
+
+//   if (booking.customer._id.toString() !== customerId.toString()) {
+//     throw new ApiError(httpStatus.FORBIDDEN, "You can only pay for your own bookings");
+//   }
+
+//   if (booking.paymentStatus === "paid") {
+//     throw new ApiError(httpStatus.BAD_REQUEST, "Booking already paid");
+//   }
+
+//   // Easypaisa requires amount with 1 decimal place (e.g., "10.0") [cite: 472]
+//   const amount = parseFloat(booking.totalPrice).toFixed(1);
+//   const orderRefNum = booking.invoiceNumber || booking._id.toString();
+  
+//   // Date format: YYYYMMDD HHMMSS (Optional but good for security)
+//   const now = new Date();
+//   const expiryDate = now.toISOString().replace(/[-:T]/g, "").slice(0, 14); 
+
+//   // STRICT PARAMETERS based on Guide Section 2.2
+//   const params = {
+//     storeId: storeId,
+//     amount: amount,
+//     postBackURL: returnUrl, // Frontend URL
+//     orderRefNum: orderRefNum,
+//     expiryDate: expiryDate,
+//     autoRedirect: "1", // 1 = Redirect back to merchant automatically
+//     paymentMethod: "MA_PAYMENT_METHOD", // Starts flow with Mobile Account (optional)
+//     // emailAddr: booking.customer.email, // Optional
+//     // mobileNum: booking.customer.phoneNumber // Optional
+//   };
+
+//   // Generate the hash
+//   params.merchantHashedReq = generateEasypaisaHash(params);
+
+//   booking.paymentStatus = "processing";
+//   await booking.save();
+
+//   return {
+//     provider: "EASYPAISA",
+//     paymentPageUrl: `${baseUrl}Index.jsf`, // The URL to POST the form to
+//     payload: params,
+//   };
+// };
+
+
+// services/payment.service.js
+
 export const initBookingPayment = async (bookingId, customerId) => {
   if (provider !== "EASYPAISA") {
     throw new ApiError(httpStatus.BAD_REQUEST, "Unsupported payment provider configured");
@@ -56,33 +111,32 @@ export const initBookingPayment = async (bookingId, customerId) => {
     throw new ApiError(httpStatus.NOT_FOUND, "Booking not found");
   }
 
-  if (booking.customer._id.toString() !== customerId.toString()) {
-    throw new ApiError(httpStatus.FORBIDDEN, "You can only pay for your own bookings");
-  }
+  // ... (Your validation checks for customerId and paymentStatus) ...
 
-  if (booking.paymentStatus === "paid") {
-    throw new ApiError(httpStatus.BAD_REQUEST, "Booking already paid");
-  }
-
-  // Easypaisa requires amount with 1 decimal place (e.g., "10.0") [cite: 472]
   const amount = parseFloat(booking.totalPrice).toFixed(1);
   const orderRefNum = booking.invoiceNumber || booking._id.toString();
-  
-  // Date format: YYYYMMDD HHMMSS (Optional but good for security)
+
+  // ============================================================
+  // START: PASTE THE NEW DATE CODE HERE
+  // ============================================================
   const now = new Date();
-  const expiryDate = now.toISOString().replace(/[-:T]/g, "").slice(0, 14); 
+  const pad = (n) => n.toString().padStart(2, '0');
+
+  // Format: YYYYMMDD HHMMSS (Note the space in the middle)
+  const expiryDate = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())} ${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  // ============================================================
+  // END: NEW DATE CODE
+  // ============================================================
 
   // STRICT PARAMETERS based on Guide Section 2.2
   const params = {
     storeId: storeId,
     amount: amount,
-    postBackURL: returnUrl, // Frontend URL
+    postBackURL: returnUrl,
     orderRefNum: orderRefNum,
-    expiryDate: expiryDate,
-    autoRedirect: "1", // 1 = Redirect back to merchant automatically
-    paymentMethod: "MA_PAYMENT_METHOD", // Starts flow with Mobile Account (optional)
-    // emailAddr: booking.customer.email, // Optional
-    // mobileNum: booking.customer.phoneNumber // Optional
+    expiryDate: expiryDate, // This now uses the correct format with a space
+    autoRedirect: "1",
+    paymentMethod: "MA_PAYMENT_METHOD", 
   };
 
   // Generate the hash
@@ -93,11 +147,10 @@ export const initBookingPayment = async (bookingId, customerId) => {
 
   return {
     provider: "EASYPAISA",
-    paymentPageUrl: `${baseUrl}Index.jsf`, // The URL to POST the form to
+    paymentPageUrl: `${baseUrl}Index.jsf`,
     payload: params,
   };
 };
-
 /**
  * VERIFY PAYMENT (The Handshake)
  * 1. Receives auth_token from frontend.

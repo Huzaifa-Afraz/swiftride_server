@@ -259,7 +259,7 @@ export const createBooking = async (customerId, payload) => {
     totalPrice,
     invoiceNumber,
     status: "pending",
-    paymentStatus: "paid", // ✅ Changed from default "unpaid"
+    paymentStatus: "unpaid",
   });
 
   booking.statusHistory.push({
