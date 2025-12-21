@@ -20,14 +20,15 @@ const allowedOrigins = [
   "https://swiftride-frontend.vercel.app"
 ];
 
-app.use(
-  cors({
-    origin: allowedOrigins,
-    credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"],
-    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"]
-  })
-);
+const corsOptions = {
+  origin: allowedOrigins,
+  credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"]
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 app.use(helmet());
 app.use(express.json());
