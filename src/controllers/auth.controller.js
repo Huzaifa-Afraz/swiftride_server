@@ -159,13 +159,22 @@ export const googleLogin = async (req, res, next) => {
     let user = await User.findOne({ email });
 
     if (!user) {
-      // 3. If no user, Create New User
+      // 3. If no user, Check if Role is provided
+      if (!role) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found. Please sign up.",
+          requiresSignup: true,
+        });
+      }
+
+      // 4. Create New User (Only if role is provided)
       user = await User.create({
         name,
         email,
         profilePicture: picture,
-        role: role || "customer", // Default to customer if not specified
-        isVerified: false, // Google emails are verified
+        role: role, // Explicit role required
+        isVerified: false, 
         isEmailVerified: true,
         provider: "google",
       });
