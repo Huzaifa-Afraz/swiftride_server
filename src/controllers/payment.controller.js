@@ -74,8 +74,8 @@ export const initSafepayPayment = catchAsync(async (req, res) => {
 export const safepayWebhook = catchAsync(async (req, res) => {
 console.log("===================================");
 console.log("🔥 WEBHOOK RECEIVED!");
-console.log("Headers:", req.headers); // Check if x-sfpy-signature exists
-console.log("Body:", req.body);       // Check if data is correct
+console.log("Headers:", req.headers);
+console.log("Body:", req.body);      
 console.log("===================================");
   await safepayService.handleSafepayWebhook(req);
 

@@ -142,12 +142,15 @@ export const updateBookingStatus = catchAsync(async (req, res) => {
 // });
 export const getMyBookings = catchAsync(async (req, res) => {
   const userId = req.user.id;
+  console.log("user id is: ", userId)
 
   const bookings = await Booking.find({ customer: userId })
     .populate("car", "make model year photos location")
     .sort({ createdAt: -1 });
+    console.log("bookings: ", bookings)
 
   const items = bookings.map(mapBookingSummaryForUser);
+  console.log("items: ", items)
 
   sendSuccessResponse(res, httpStatus.OK, "My bookings fetched", {
     items
