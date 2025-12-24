@@ -29,7 +29,7 @@ const mapBookingSummaryDTO = (booking) => {
             booking.car.photos && booking.car.photos.length > 0
               ? booking.car.photos[0]
               : null,
-          location: booking.car.location || null
+          location: booking.car.location.address || null
         }
       : null,
 
