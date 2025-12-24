@@ -143,81 +143,22 @@ export const getMe = catchAsync(async (req, res) => {
 //   });
 // });
 
-export const googleLogin = async (req, res, next) => {
-  try {
-    const { idToken, role } = req.body; // Role (customer/host) passed from frontend
+export const googleLogin = catchAsync(async (req, res) => {
+  // Pass the request body to the service
+  // Service handles verification, user creation/linking, and sanitization (including KYC flags)
+  const result = await authService.googleLogin(req.body);
 
-    if (!idToken) {
-      return res.status(400).json({ message: "Google Token is required" });
-    }
-
-    // 1. Verify Token
-    const googleUser = await verifyGoogleToken(idToken);
-    const { email, name, picture } = googleUser;
-
-    // 2. Check if user exists
-    let user = await User.findOne({ email });
-
-    if (!user) {
-      // 3. If no user, Check if Role is provided
-      if (!role) {
-        return res.status(404).json({
-          success: false,
-          message: "User not found. Please sign up.",
-          requiresSignup: true,
-        });
-      }
-
-      // 4. Create New User (Only if role is provided)
-      user = await User.create({
-        name,
-        email,
-        profilePicture: picture,
-        role: role, // Explicit role required
-        isVerified: false, 
-        isEmailVerified: true,
-        provider: "google",
-      });
-    }
-
-    // 4. Generate JWT (Same as your normal login)
-    // const token = jwt.sign(
-    //   { id: user._id, role: user.role },
-    //   process.env.JWT_SECRET,
-    //   {
-    //     expiresIn: "7d",
-    //   }
-    // );
-
-    const token = authService.generateAuthToken(user);
-    
-    // res.cookie("token", token, {
-    //   httpOnly: true,
-    //   secure: false, // true on production/https
-    //   sameSite: "lax",
-    //   maxAge: 7 * 24 * 60 * 60 * 1000,  
-    // });
-
-    // res.status(200).json({
-    //   success: true,
-    //   token,
-    //   user,
-    // });
-
-
-      res.cookie("token", token?.accessToken, {
+  // Set cookie for web clients
+  res.cookie("token", result.tokens?.accessToken, {
     httpOnly: true,
-    secure: true, 
+    secure: true,
     sameSite: "none",
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: "/",
   });
 
-  sendSuccessResponse(res, httpStatus.OK, "Login successful", {
-    user: user,
-    token: token?.accessToken,
+  sendSuccessResponse(res, httpStatus.OK, "Google login successful", {
+    user: result.user,
+    token: result.tokens?.accessToken,
   });
-  } catch (error) {
-    next(error);
-  }
-};
+});
