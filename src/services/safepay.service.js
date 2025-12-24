@@ -3,6 +3,7 @@ import httpStatus from "http-status";
 import ApiError from "../utils/ApiError.js";
 import { Booking } from "../models/booking.model.js";
 import * as walletService from "./wallet.service.js";
+import mongoose from "mongoose";
 
 // Initialize SDK
 // Change environment to 'production' when going live
