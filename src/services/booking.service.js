@@ -500,7 +500,7 @@ export const updateBookingStatus = async (
 
   // On confirm – generate invoice + email
   if (newStatus === "confirmed") {
-    const pdfPath = generateInvoicePDF(
+    const pdfPath = await generateInvoicePDF(
       booking,
       booking.car,
       booking.customer,
