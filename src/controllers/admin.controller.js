@@ -56,27 +56,27 @@ const mapBookingSummaryDTO = (booking) => {
   };
 };
 
-// const mapBookingDetailDTO = (booking) => {
-//   const base = mapBookingSummaryDTO(booking);
+const mapBookingDetailDTO = (booking) => {
+  const base = mapBookingSummaryDTO(booking);
 
-//   return {
-//     ...base,
-//     platformCommissionPercent: booking.platformCommissionPercent,
-//     platformCommissionAmount: booking.platformCommissionAmount,
-//     ownerEarningAmount: booking.ownerEarningAmount,
-//     isPaid: booking.paymentStatus === "paid",
-//     invoicePdfPath: booking.pdfPath || null,
-//     invoiceDownloadPath: booking._id
-//       ? `/api/bookings/invoice/${booking._id}`
-//       : null,
-//     statusTimeline: (booking.statusHistory || []).map((h) => ({
-//       status: h.status,
-//       changedAt: h.changedAt,
-//       changedBy: h.changedBy,
-//       note: h.note
-//     }))
-//   };
-// };
+  return {
+    ...base,
+    platformCommissionPercent: booking.platformCommissionPercent,
+    platformCommissionAmount: booking.platformCommissionAmount,
+    ownerEarningAmount: booking.ownerEarningAmount,
+    isPaid: booking.paymentStatus === "paid",
+    invoicePdfPath: booking.pdfPath || null,
+    invoiceDownloadPath: booking._id
+      ? `/api/bookings/invoice/${booking._id}`
+      : null,
+    statusTimeline: (booking.statusHistory || []).map((h) => ({
+      status: h.status,
+      changedAt: h.changedAt,
+      changedBy: h.changedBy,
+      note: h.note
+    }))
+  };
+};
 
 
 
