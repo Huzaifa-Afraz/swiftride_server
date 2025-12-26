@@ -7,5 +7,5 @@ export const createBookingSchema = Joi.object({
 });
 
 export const updateBookingStatusSchema = Joi.object({
-  status: Joi.string().valid("confirmed", "cancelled", "completed").required(),
+  status: Joi.string().valid("pending", "confirmed", "ongoing", "completed", "cancelled").required(),
 });

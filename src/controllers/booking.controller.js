@@ -116,6 +116,7 @@ export const updateBookingStatus = catchAsync(async (req, res) => {
   const ownerId = req.user.id;
   const { id } = req.params;
   const { status, note } = req.body;
+  console.log("Updating booking status: ", { id, ownerId, status, note });
 
   const booking = await bookingService.updateBookingStatus(
     id,

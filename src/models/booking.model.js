@@ -74,7 +74,14 @@ const bookingSchema = new mongoose.Schema(
       enum: ["unpaid", "processing", "paid", "failed"],
       default: "unpaid"
     },
-    paymentReference: String
+    
+    currentLocation: {
+      lat: Number,
+      lng: Number,
+      heading: Number,
+      updatedAt: Date
+    },
+    paymentReference: String,
   },
   { timestamps: true }
 );
