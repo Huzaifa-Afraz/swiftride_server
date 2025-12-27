@@ -68,7 +68,8 @@ export const requireKycApproved = (req, res, next) => {
     );
   }
 
-  if (!req.user.isKycApproved) {
+  // Check isVerified field (matches User model)
+  if (!req.user.isVerified) {
     return next(
       new ApiError(
         httpStatus.FORBIDDEN,
