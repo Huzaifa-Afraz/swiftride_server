@@ -258,10 +258,18 @@ export const createBooking = async (customerId, payload) => {
     const [carStartHour, carStartMin] = carStartTime.split(":").map(Number);
     const [carEndHour, carEndMin] = carEndTime.split(":").map(Number);
 
+    // Convert UTC to PKT (UTC+5) for comparison
+    // getHours() returns UTC hours, we need local Pakistan time
+    const PKT_OFFSET_HOURS = 5;
+    const bookingStartHour = (start.getUTCHours() + PKT_OFFSET_HOURS) % 24;
+    const bookingStartMin = start.getUTCMinutes();
+    const bookingEndHour = (end.getUTCHours() + PKT_OFFSET_HOURS) % 24;
+    const bookingEndMin = end.getUTCMinutes();
+
     const carStartMinutes = carStartHour * 60 + carStartMin;
     const carEndMinutes = carEndHour * 60 + carEndMin;
-    const bookingStartMinutes = start.getHours() * 60 + start.getMinutes();
-    const bookingEndMinutes = end.getHours() * 60 + end.getMinutes();
+    const bookingStartMinutes = bookingStartHour * 60 + bookingStartMin;
+    const bookingEndMinutes = bookingEndHour * 60 + bookingEndMin;
 
     if (bookingStartMinutes < carStartMinutes) {
       throw new ApiError(
