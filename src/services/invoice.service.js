@@ -44,6 +44,12 @@ export const generateInvoicePDF = (booking, car, customer, owner) => {
       // Pipe document to Cloudinary
       doc.pipe(uploadStream);
 
+      // Handle PDF generation errors
+      doc.on('error', (err) => {
+        console.error("PDF Generation Error:", err);
+        reject(err);
+      });
+
       // 2. Setup Asset Paths (Safe for Vercel)
       const logoPath = path.join(process.cwd(), "public", "logo.png");
       const signaturePath = path.join(process.cwd(), "public", "signature.png");

@@ -240,6 +240,12 @@ export const downloadInvoice = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.NOT_FOUND, "Invoice not available");
   }
 
+  // Check if it's a Cloudinary URL (or any remote URL)
+  if (booking.pdfPath.startsWith("http")) {
+    return res.redirect(booking.pdfPath);
+  }
+
+  // Fallback for local files (legacy support)
   return res.download(booking.pdfPath);
 });
 
