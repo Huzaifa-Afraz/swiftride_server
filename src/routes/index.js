@@ -7,6 +7,8 @@ import bookingRoutes from "./booking.routes.js";
 import paymentRoutes from "./payment.routes.js";
 import walletRoutes from "./wallet.routes.js";
 import hostRoutes from "./host.routes.js";
+import reviewRoutes from "./review.routes.js";
+import chatRoutes from "./chat.routes.js";
 
 const router = express.Router();
 
@@ -18,4 +20,6 @@ router.use("/bookings", bookingRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/wallet", walletRoutes);
 router.use("/host", hostRoutes);
+router.use("/reviews", reviewRoutes);
+router.use("/chat", chatRoutes);
 export default router;

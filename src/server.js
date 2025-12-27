@@ -20,6 +20,7 @@ async function startServer() {
     server.listen(PORT, () => {
       console.log(`SwiftRide API running on http://localhost:${PORT}/api/`);
       console.log(`Socket.IO running on http://localhost:${PORT}`);
+      console.log("Chat Routes Loaded"); // Confirm restart
     });
   } catch (error) {
     console.error("Failed to start server:", error);

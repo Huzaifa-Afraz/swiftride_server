@@ -46,7 +46,7 @@ const payload = jwt.verify(finalToken, process.env.JWT_SECRET);
     }
 
     // 4) Attach to req
-    req.user = { id: user._id.toString(), role: user.role };
+    req.user = { _id: user._id, id: user._id.toString(), role: user.role };
     console.log("Authenticated user:", req.user);
 
     next();
