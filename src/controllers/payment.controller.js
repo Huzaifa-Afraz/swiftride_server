@@ -33,15 +33,15 @@ export const easypaisaCallback = catchAsync(async (req, res) => {
 
   // If this is an IPN (Server-to-Server), simply return 200 OK
   // If this is a Browser Redirect, you might want to redirect to your frontend success page
-  
+
   // Checking if it's likely a browser request (Accept header contains html)
   const acceptHeader = req.get("Accept") || "";
-  
+
   if (acceptHeader.includes("text/html")) {
-     // Redirect user to frontend
-     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-     const redirectPath = isSuccess ? "/payment/success" : "/payment/failed";
-     return res.redirect(`${frontendUrl}${redirectPath}`);
+    // Redirect user to frontend
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const redirectPath = isSuccess ? "/payment/success" : "/payment/failed";
+    return res.redirect(`${frontendUrl}${redirectPath}`);
   }
 
   // Otherwise, strictly API response
@@ -57,10 +57,11 @@ export const easypaisaCallback = catchAsync(async (req, res) => {
 export const initSafepayPayment = catchAsync(async (req, res) => {
   const { bookingId } = req.params;
   const userId = req.user.id; // From auth middleware
+  const platform = req.query.platform || "web"; // 'mobile' or 'web' (default)
 
-  console.log("getting request: ", bookingId, " ", userId)
+  console.log("getting request: ", bookingId, " ", userId, " platform:", platform)
 
-  const result = await safepayService.initSafepayPayment(bookingId, userId);
+  const result = await safepayService.initSafepayPayment(bookingId, userId, platform);
 
   sendSuccessResponse(
     res,
@@ -72,11 +73,11 @@ export const initSafepayPayment = catchAsync(async (req, res) => {
 
 // SAFEPAY: Webhook
 export const safepayWebhook = catchAsync(async (req, res) => {
-console.log("===================================");
-console.log("🔥 WEBHOOK RECEIVED!");
-console.log("Headers:", req.headers);
-console.log("Body:", req.body);      
-console.log("===================================");
+  console.log("===================================");
+  console.log("🔥 WEBHOOK RECEIVED!");
+  console.log("Headers:", req.headers);
+  console.log("Body:", req.body);
+  console.log("===================================");
   await safepayService.handleSafepayWebhook(req);
 
   // Always return 200 to Safepay so they stop retrying

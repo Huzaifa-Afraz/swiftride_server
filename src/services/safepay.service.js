@@ -19,8 +19,11 @@ const safepay = new Safepay({
  * - Calculates amount from Booking DB
  * - Creates Safepay Session
  * - Returns the Redirect URL
+ * @param {string} bookingId - Booking ID
+ * @param {string} userId - User ID  
+ * @param {string} platform - Optional: 'web' (default) or 'mobile'
  */
-export const initSafepayPayment = async (bookingId, userId) => {
+export const initSafepayPayment = async (bookingId, userId, platform = "web") => {
   const booking = await Booking.findById(bookingId).populate("customer");
   
   if (!booking) {
@@ -51,12 +54,25 @@ export const initSafepayPayment = async (bookingId, userId) => {
   });
 
   // 2. Generate Checkout URL
-  // 'source: custom' allows using your own success/cancel pages
+  // Determine redirect URLs based on platform
+  let cancelUrl, redirectUrl;
+  
+  if (platform === "mobile") {
+    // Mobile app: Use deep link scheme to return to app
+    const mobileScheme = process.env.MOBILE_APP_SCHEME || "swiftride";
+    cancelUrl = `${mobileScheme}://payment/cancel`;
+    redirectUrl = `${mobileScheme}://payment/success`;
+  } else {
+    // Web app: Use frontend URL (original behavior)
+    cancelUrl = `${process.env.FRONTEND_URL}/payment/cancel`;
+    redirectUrl = `${process.env.FRONTEND_URL}/payment/success`;
+  }
+
   const url = safepay.checkout.create({
     token,
     orderId: booking.invoiceNumber || booking._id.toString(),
-    cancelUrl: `${process.env.FRONTEND_URL}/payment/cancel`, // Where to go if they click cancel
-    redirectUrl: `${process.env.FRONTEND_URL}/payment/success`, // Where to go after success
+    cancelUrl,
+    redirectUrl,
     source: "custom",
     webhooks: true, // Crucial: Enables the webhook call
   });
