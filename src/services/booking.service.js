@@ -219,20 +219,79 @@ export const createBooking = async (customerId, payload) => {
   if (start >= end) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Invalid booking dates");
   }
+  // ============================================
+  // AVAILABILITY VALIDATION
+  // ============================================
+  if (car.availability) {
+    // Check if car is marked as available
+    if (car.availability.isAvailable === false) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        "This car is currently not available for booking"
+      );
+    }
 
-  // Optional: basic availability check
-  if (car.availability?.isAvailable) {
-    const startDay = start.getDay(); // 0-6
-    const endDay = end.getDay();
-
+    // Check day of week
     const daysAllowed = car.availability.daysOfWeek || [0, 1, 2, 3, 4, 5, 6];
-    // if (!daysAllowed.includes(startDay) || !daysAllowed.includes(endDay)) {
-    //   throw new ApiError(
-    //     httpStatus.BAD_REQUEST,
-    //     "Car is not available on selected days"
-    //   );
-    // }
-    // you can further check time within startTime/endTime if you want
+    const startDay = start.getDay(); // 0 = Sunday, 6 = Saturday
+    const endDay = end.getDay();
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+    if (!daysAllowed.includes(startDay)) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        `Car is not available on ${dayNames[startDay]}. Available days: ${daysAllowed.map(d => dayNames[d]).join(", ")}`
+      );
+    }
+
+    if (!daysAllowed.includes(endDay)) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        `Car is not available on ${dayNames[endDay]}. Available days: ${daysAllowed.map(d => dayNames[d]).join(", ")}`
+      );
+    }
+
+    // Check time range
+    const carStartTime = car.availability.startTime || "00:00";
+    const carEndTime = car.availability.endTime || "23:59";
+
+    const [carStartHour, carStartMin] = carStartTime.split(":").map(Number);
+    const [carEndHour, carEndMin] = carEndTime.split(":").map(Number);
+
+    const carStartMinutes = carStartHour * 60 + carStartMin;
+    const carEndMinutes = carEndHour * 60 + carEndMin;
+    const bookingStartMinutes = start.getHours() * 60 + start.getMinutes();
+    const bookingEndMinutes = end.getHours() * 60 + end.getMinutes();
+
+    if (bookingStartMinutes < carStartMinutes) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        `Booking start time is too early. Car is available from ${carStartTime}`
+      );
+    }
+
+    if (bookingEndMinutes > carEndMinutes) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        `Booking end time is too late. Car must be returned by ${carEndTime}`
+      );
+    }
+  }
+
+  // ============================================
+  // OVERLAP CHECK - Prevent double bookings
+  // ============================================
+  const overlapping = await Booking.findOne({
+    car: carId,
+    status: { $in: ["pending", "confirmed", "ongoing"] },
+    $or: [{ startDateTime: { $lte: end }, endDateTime: { $gte: start } }]
+  });
+
+  if (overlapping) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Car is already booked for the selected time. Please choose different dates/times."
+    );
   }
 
   const durationHours = Math.ceil(Math.abs(end - start) / 36e5);
