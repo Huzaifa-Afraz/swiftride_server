@@ -166,44 +166,50 @@ export const googleLogin = async ({ idToken, role, showroomName }) => {
   const googleId = payload.sub;
   const fullName = payload.name;
 
+  console.log("Google Payload:", JSON.stringify(payload, null, 2));
+
   let user = await User.findOne({ email });
 
   // First time google user
   if (!user) {
-    // If role is NOT provided for a new user, we request it from the frontend
+    // ... (existing creation logic)
     if (!role) {
-      // Return a specific error/flag so frontend knows to show "Select Role" modal
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        "Role is required for new users"
-      );
+      throw new ApiError(httpStatus.BAD_REQUEST, "Role is required for new users");
     }
-
     if (role === USER_ROLE.SHOWROOM && !showroomName) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        "showroomName is required when role is showroom"
-      );
+      throw new ApiError(httpStatus.BAD_REQUEST, "showroomName is required when role is showroom");
     }
 
     user = await User.create({
       fullName: role === USER_ROLE.SHOWROOM ? undefined : fullName,
-      showroomName:
-        role === USER_ROLE.SHOWROOM ? showroomName : undefined,
+      showroomName: role === USER_ROLE.SHOWROOM ? showroomName : undefined,
       email,
       role,
       googleId,
-      profilePicture: payload.picture, // Save Google Profile Picture
-      isEmailVerified: true, // Email IS verified (Google)
-      isVerified: false, // KYC is NOT verified
-      isKycApproved: false, // Legacy flag
+      profilePicture: payload.picture, 
+      isEmailVerified: true,
+      isVerified: false,
+      isKycApproved: false,
     });
   } else {
     // Link google id if missing
+    let updates = false;
     if (!user.googleId) {
       user.googleId = googleId;
-      await user.save();
+      updates = true;
     }
+    // Sync Profile Picture if missing
+    if (!user.profilePicture && payload.picture) {
+        user.profilePicture = payload.picture;
+        updates = true;
+    }
+    // Sync Full Name if missing (and not a showroom)
+    if (!user.fullName && payload.name && user.role !== USER_ROLE.SHOWROOM) {
+        user.fullName = payload.name;
+        updates = true;
+    }
+    
+    if (updates) await user.save();
   }
 
   const tokens = generateAuthToken(user);
