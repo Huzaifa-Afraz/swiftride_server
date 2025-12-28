@@ -12,7 +12,9 @@ export const handleSocketConnection = (io, socket) => {
 
   socket.on("send_location", async (data) => {
     try {
+      console.log(`📍 Location received for booking ${data.bookingId}:`, data.lat, data.lng);
       io.to(data.bookingId).emit("receive_location", data);
+      console.log(`📡 Broadcasted to room ${data.bookingId}`);
       await trackingService.processLocationUpdate(data.bookingId, data);
     } catch (error) {
       console.error("Tracking Error:", error);
@@ -30,7 +32,7 @@ export const handleSocketConnection = (io, socket) => {
     // data = { chatId, senderId, content }
     try {
       const { chatId, senderId, content } = data;
-      
+
       // 1. Save to DB
       const message = await Message.create({
         chat: chatId,
