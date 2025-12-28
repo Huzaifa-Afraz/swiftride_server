@@ -1,16 +1,29 @@
-import { OAuth2Client } from "google-auth-library";
+import axios from "axios";
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// This comes from your Firebase/Google Console configuration
+const EXPECTED_AUDIENCE = "400619671340-ndjjdcr3fs8bsalutjb9ldqs1egma49v.apps.googleusercontent.com";
 
 const verifyGoogleToken = async (idToken) => {
   try {
-    const ticket = await client.verifyIdToken({
-      idToken: idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
-    return ticket.getPayload(); // Returns { email, name, picture, sub, etc. }
+    // Verify valid token via Google's public endpoint
+    console.log("Verifying ID Token with Google...");
+    const response = await axios.get(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`
+    );
+
+    const payload = response.data;
+    console.log("Token Payload Audience:", payload.aud);
+
+    // Verify Audience
+    if (payload.aud !== EXPECTED_AUDIENCE) {
+      console.error(`Audience Mismatch! Expected ${EXPECTED_AUDIENCE} but got ${payload.aud}`);
+      throw new Error("Token audience mismatch (Invalid Client ID)");
+    }
+
+    return payload; // Returns { email, name, picture, sub, etc. }
   } catch (error) {
-    throw new Error("Invalid Google Token");
+    console.error("Token verification failed details:", error.response?.data || error.message);
+    throw new Error("Invalid Google/Firebase Token");
   }
 };
 

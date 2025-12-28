@@ -1,15 +1,13 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import httpStatus from "http-status";
-import { OAuth2Client } from "google-auth-library";
 import crypto from "crypto";
 import { PasswordResetToken } from "../models/passwordReset.model.js";
 import { sendPasswordResetEmail } from "../utils/email.js";
 import { User, USER_ROLE } from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
 import { Kyc } from "../models/kyc.model.js";
-
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+import verifyGoogleToken from "../helpers/googleAuth.helper.js";
 
 // const sanitizeUser = (user) => {
 //   const obj = user.toObject();
@@ -27,6 +25,7 @@ export const sanitizeUser = (userDoc) => {
     email: u.email,
     phoneNumber: u.phoneNumber,
     role: u.role,
+    profilePicture: u.profilePicture,
     status: u.status,
     isEmailVerified: !!u.isEmailVerified,
     isVerified: !!u.isVerified, // friendly flag
@@ -162,12 +161,7 @@ export const googleLogin = async ({ idToken, role, showroomName }) => {
     throw new ApiError(httpStatus.BAD_REQUEST, "idToken is required");
   }
 
-  const ticket = await googleClient.verifyIdToken({
-    idToken,
-    audience: process.env.GOOGLE_CLIENT_ID,
-  });
-
-  const payload = ticket.getPayload();
+  const payload = await verifyGoogleToken(idToken);
   const email = payload.email;
   const googleId = payload.sub;
   const fullName = payload.name;
@@ -176,12 +170,16 @@ export const googleLogin = async ({ idToken, role, showroomName }) => {
 
   // First time google user
   if (!user) {
-    let resolvedRole = role;
-    if (!resolvedRole) {
-      resolvedRole = USER_ROLE.CUSTOMER;
+    // If role is NOT provided for a new user, we request it from the frontend
+    if (!role) {
+      // Return a specific error/flag so frontend knows to show "Select Role" modal
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        "Role is required for new users"
+      );
     }
 
-    if (resolvedRole === USER_ROLE.SHOWROOM && !showroomName) {
+    if (role === USER_ROLE.SHOWROOM && !showroomName) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         "showroomName is required when role is showroom"
@@ -189,16 +187,16 @@ export const googleLogin = async ({ idToken, role, showroomName }) => {
     }
 
     user = await User.create({
-      fullName: resolvedRole === USER_ROLE.SHOWROOM ? undefined : fullName,
+      fullName: role === USER_ROLE.SHOWROOM ? undefined : fullName,
       showroomName:
-        resolvedRole === USER_ROLE.SHOWROOM ? showroomName : undefined,
+        role === USER_ROLE.SHOWROOM ? showroomName : undefined,
       email,
-      role: resolvedRole,
+      role,
       googleId,
-      // ✅ FIX IS HERE:
+      profilePicture: payload.picture, // Save Google Profile Picture
       isEmailVerified: true, // Email IS verified (Google)
-      isVerified: false, // KYC is NOT verified (Critical Fix)
-      isKycApproved: false, // Legacy flag just in case
+      isVerified: false, // KYC is NOT verified
+      isKycApproved: false, // Legacy flag
     });
   } else {
     // Link google id if missing

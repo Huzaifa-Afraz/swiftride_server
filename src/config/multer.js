@@ -56,3 +56,8 @@ export const carUpload = multer({
   storage: storage,
   limits: { fileSize: 5 * 1024 * 1024 } 
 });
+
+export const profileUpload = multer({
+  storage: storage,
+  limits: { fileSize: 2 * 1024 * 1024 } // 2MB limit for profiles
+});
