@@ -82,6 +82,18 @@ const bookingSchema = new mongoose.Schema(
       updatedAt: Date
     },
     paymentReference: String,
+    
+    // --- QR Handover & Claims ---
+    handoverSecret: { type: String, select: false }, // Hidden by default for security
+    
+    pickupImages: [{ type: String }], // Array of image URLs
+    returnImages: [{ type: String }],
+    
+    handoverStatus: {
+      type: String,
+      enum: ["pending", "pickup_scanned", "active", "return_scanned", "completed"],
+      default: "pending"
+    }
   },
   { timestamps: true }
 );

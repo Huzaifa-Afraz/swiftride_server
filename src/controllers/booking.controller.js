@@ -89,7 +89,8 @@ const mapBookingDetailForUser = (booking) => {
       status: h.status,
       changedAt: h.changedAt,
       note: h.note
-    }))
+    })),
+    handoverSecret: booking.handoverSecret // Will only be present if selected and user is authorized to see it (handled by filtering/logic or frontend usage)
   };
 };
 
@@ -256,6 +257,7 @@ export const getBookingDetailForUser = catchAsync(async (req, res) => {
   const userRole = req.user.role;
 
   const booking = await Booking.findById(bookingId)
+    .select("+handoverSecret")
     .populate("car", "make model year photos location")
     .populate("customer", "fullName email")
     .populate("owner", "fullName email");
@@ -283,6 +285,8 @@ export const getBookingDetailForUser = catchAsync(async (req, res) => {
     data.ownerEarningAmount = booking.ownerEarningAmount;
     data.platformCommissionAmount = booking.platformCommissionAmount;
     data.platformCommissionPercent = booking.platformCommissionPercent;
+    // Hide secret from Host/Admin (they strictly SCAN it, not VIEW it)
+    delete data.handoverSecret; 
   }
 
   sendSuccessResponse(res, httpStatus.OK, "Booking detail fetched", {

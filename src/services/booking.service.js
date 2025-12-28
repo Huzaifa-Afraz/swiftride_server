@@ -563,6 +563,13 @@ export const updateBookingStatus = async (
   }
 
   booking.status = newStatus;
+  
+  // Handover Secret Generation
+  if (newStatus === "confirmed" && !booking.handoverSecret) {
+      const { randomBytes } = await import('crypto');
+      booking.handoverSecret = randomBytes(32).toString('hex');
+  }
+
   pushStatusHistory(booking, newStatus, ownerId, note);
 
   // On confirm – generate invoice + email
