@@ -101,6 +101,14 @@ router.get(
   bookingController.downloadInvoice
 );
 
+// Customer - update location from background (HTTP fallback for when socket unavailable)
+router.post(
+  "/:bookingId/location",
+  authenticate,
+  authorizeRoles("customer"),
+  bookingController.updateLocation
+);
+
 router.get(
   "/:bookingId",
   authenticate,

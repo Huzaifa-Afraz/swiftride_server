@@ -563,11 +563,11 @@ export const updateBookingStatus = async (
   }
 
   booking.status = newStatus;
-  
+
   // Handover Secret Generation
   if (newStatus === "confirmed" && !booking.handoverSecret) {
-      const { randomBytes } = await import('crypto');
-      booking.handoverSecret = randomBytes(32).toString('hex');
+    const { randomBytes } = await import('crypto');
+    booking.handoverSecret = randomBytes(32).toString('hex');
   }
 
   pushStatusHistory(booking, newStatus, ownerId, note);
@@ -688,6 +688,23 @@ export const extendBooking = async (bookingId, customerId, newEndTime) => {
   booking.endDateTime = newEnd;
   booking.totalPrice += extraAmount;
   booking.isExtended = true;
+
+  await booking.save();
+  return booking;
+};
+
+// Update booking's current location (for background tracking)
+export const updateBookingLocation = async (bookingId, locationData) => {
+  const booking = await Booking.findById(bookingId);
+  if (!booking) return null;
+
+  booking.currentLocation = {
+    lat: locationData.lat,
+    lng: locationData.lng,
+    heading: locationData.heading || 0,
+    speed: locationData.speed || 0,
+    updatedAt: locationData.updatedAt || new Date(),
+  };
 
   await booking.save();
   return booking;

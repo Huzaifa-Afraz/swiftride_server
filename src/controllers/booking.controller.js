@@ -57,16 +57,16 @@ const mapBookingSummaryForUser = (booking) => {
 
     car: booking.car
       ? {
-          id: booking.car._id,
-          make: booking.car.make,
-          model: booking.car.model,
-          year: booking.car.year,
-          primaryPhoto:
-            booking.car.photos && booking.car.photos.length > 0
-              ? booking.car.photos[0]
-              : null,
-          location: booking.car.location || null
-        }
+        id: booking.car._id,
+        make: booking.car.make,
+        model: booking.car.model,
+        year: booking.car.year,
+        primaryPhoto:
+          booking.car.photos && booking.car.photos.length > 0
+            ? booking.car.photos[0]
+            : null,
+        location: booking.car.location || null
+      }
       : null,
 
     // For /me endpoint, we don't need customer/owner details – caller knows who they are
@@ -149,7 +149,7 @@ export const getMyBookings = catchAsync(async (req, res) => {
   const bookings = await Booking.find({ customer: userId })
     .populate("car", "make model year photos location")
     .sort({ createdAt: -1 });
-    console.log("bookings: ", bookings)
+  console.log("bookings: ", bookings)
 
   const items = bookings.map(mapBookingSummaryForUser);
   console.log("items: ", items)
@@ -180,10 +180,10 @@ export const getOwnerBookings = catchAsync(async (req, res) => {
     ...mapBookingSummaryForUser(b),
     customer: b.customer
       ? {
-          id: b.customer._id,
-          name: b.customer.fullName,
-          email: b.customer.email
-        }
+        id: b.customer._id,
+        name: b.customer.fullName,
+        email: b.customer.email
+      }
       : null
   }));
 
@@ -286,10 +286,53 @@ export const getBookingDetailForUser = catchAsync(async (req, res) => {
     data.platformCommissionAmount = booking.platformCommissionAmount;
     data.platformCommissionPercent = booking.platformCommissionPercent;
     // Hide secret from Host/Admin (they strictly SCAN it, not VIEW it)
-    delete data.handoverSecret; 
+    delete data.handoverSecret;
   }
 
   sendSuccessResponse(res, httpStatus.OK, "Booking detail fetched", {
     booking: data
   });
+});
+
+// Update location from background (HTTP fallback when socket unavailable)
+export const updateLocation = catchAsync(async (req, res) => {
+  const { bookingId } = req.params;
+  const { lat, lng, heading, speed, timestamp } = req.body;
+
+  // Validate
+  if (!lat || !lng) {
+    return sendSuccessResponse(res, httpStatus.BAD_REQUEST, "lat and lng are required");
+  }
+
+  // Update booking's currentLocation in DB
+  const booking = await bookingService.updateBookingLocation(bookingId, {
+    lat,
+    lng,
+    heading: heading || 0,
+    speed: speed || 0,
+    updatedAt: timestamp || new Date(),
+  });
+
+  if (!booking) {
+    return sendSuccessResponse(res, httpStatus.NOT_FOUND, "Booking not found");
+  }
+
+  // Broadcast to socket room for real-time tracking on host's device
+  const { getIO } = await import("../socket/socket.server.js");
+  try {
+    const io = getIO();
+    io.to(bookingId).emit("receive_location", {
+      bookingId,
+      lat,
+      lng,
+      heading: heading || 0,
+      speed: speed || 0,
+      timestamp: timestamp || new Date().toISOString(),
+    });
+    console.log("📍 Background location received & broadcasted:", bookingId, lat, lng);
+  } catch (err) {
+    console.log("Socket broadcast skipped:", err.message);
+  }
+
+  sendSuccessResponse(res, httpStatus.OK, "Location updated");
 });
