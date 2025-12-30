@@ -65,7 +65,10 @@ const mapBookingSummaryForUser = (booking) => {
           booking.car.photos && booking.car.photos.length > 0
             ? booking.car.photos[0]
             : null,
-        location: booking.car.location || null
+        location: booking.car.location || null,
+        color: booking.car.color,
+        plateNumber: booking.car.plateNumber,
+        photos: booking.car.photos || []
       }
       : null,
 
@@ -258,7 +261,7 @@ export const getBookingDetailForUser = catchAsync(async (req, res) => {
 
   const booking = await Booking.findById(bookingId)
     .select("+handoverSecret")
-    .populate("car", "make model year photos location")
+    .populate("car", "make model year photos location color plateNumber")
     .populate("customer", "fullName email")
     .populate("owner", "fullName email");
 
