@@ -7,6 +7,7 @@ import ApiError from "../utils/ApiError.js";
 import { sendSuccessResponse } from "../utils/response.js";
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
+import { releaseBookingEarning } from "../services/wallet.service.js";
 
 export const generateHandoverSecret = () => {
   return crypto.randomBytes(32).toString("hex");
@@ -57,19 +58,31 @@ export const scanHandoverQR = catchAsync(async (req, res) => {
 // Helper for multi-image upload
 const uploadImagesToCloudinary = async (files) => {
     const urls = [];
-    for (const file of files) {
-        const result = await new Promise((resolve, reject) => {
-            const stream = cloudinary.uploader.upload_stream(
-                { folder: "swiftride/claims", resource_type: "image" },
-                (error, result) => {
-                    if (result) resolve(result);
-                    else reject(error);
-                }
-            );
-            streamifier.createReadStream(file.buffer).pipe(stream);
-        });
-        urls.push(result.secure_url);
+    console.log(`📸 Starting upload of ${files.length} images...`);
+    
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        console.log(`📸 Uploading image ${i + 1}/${files.length} (${file.size} bytes)...`);
+        
+        try {
+            const result = await new Promise((resolve, reject) => {
+                const stream = cloudinary.uploader.upload_stream(
+                    { folder: "swiftride/claims", resource_type: "image" },
+                    (error, result) => {
+                        if (result) resolve(result);
+                        else reject(error);
+                    }
+                );
+                streamifier.createReadStream(file.buffer).pipe(stream);
+            });
+            urls.push(result.secure_url);
+            console.log(`✅ Uploaded image ${i + 1}: ${result.secure_url}`);
+        } catch (error) {
+            console.error(`❌ Failed to upload image ${i + 1}:`, error);
+            throw error;
+        }
     }
+    console.log(`📸 All ${urls.length} images uploaded successfully`);
     return urls;
 };
 
@@ -90,7 +103,7 @@ export const processPickup = catchAsync(async (req, res) => {
   }
 
   // Upload images
-  const imageUrls = await uploadImages(files);
+  const imageUrls = await uploadImagesToCloudinary(files);
 
   // Update State
   booking.pickupImages = imageUrls;
@@ -119,7 +132,7 @@ export const processReturn = catchAsync(async (req, res) => {
   }
 
   // Upload images
-  const imageUrls = await uploadImages(files);
+  const imageUrls = await uploadImagesToCloudinary(files);
 
   // Update State
   booking.returnImages = imageUrls;
@@ -128,6 +141,9 @@ export const processReturn = catchAsync(async (req, res) => {
   // Process Return Payment / refunds here if needed
   
   await booking.save();
+
+  // Release earnings to wallet (pending -> available)
+  await releaseBookingEarning(booking._id);
 
   sendSuccessResponse(res, httpStatus.OK, "Trip Completed Successfully", { booking });
 });
