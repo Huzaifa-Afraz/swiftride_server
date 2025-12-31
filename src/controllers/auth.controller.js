@@ -132,16 +132,14 @@ export const getMe = catchAsync(async (req, res) => {
   sendSuccessResponse(res, httpStatus.OK, "Current user fetched", user);
 });
 
-// export const googleLogin = catchAsync(async (req, res) => {
-//   // We simply pass the request body to the service
-//   // The service handles the KYC logic (isVerified: false)
-//   const result = await authService.googleLogin(req.body);
+export const changePassword = catchAsync(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  const userId = req.user.id; // from authenticate middleware
 
-//   sendSuccessResponse(res, httpStatus.OK, "Google login successful", {
-//     user: result.user,
-//     token: result.tokens?.accessToken || result.tokens, // Handle token structure safely
-//   });
-// });
+  await authService.changePassword(userId, oldPassword, newPassword);
+
+  sendSuccessResponse(res, httpStatus.OK, "Password changed successfully");
+});
 
 export const googleLogin = catchAsync(async (req, res) => {
   // Pass the request body to the service

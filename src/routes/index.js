@@ -11,6 +11,7 @@ import reviewRoutes from "./review.routes.js";
 import chatRoutes from "./chat.routes.js";
 import userRoutes from "./user.routes.js";
 import handoverRoutes from "./handover.routes.js";
+import analyticsRoutes from "./analytics.routes.js";
 
 const router = express.Router();
 
@@ -26,4 +27,5 @@ router.use("/reviews", reviewRoutes);
 router.use("/chat", chatRoutes);
 router.use("/users", userRoutes); // /api/users
 router.use("/handover", handoverRoutes); // /api/handover
+router.use("/analytics", analyticsRoutes); // /api/analytics
 export default router;

@@ -2,8 +2,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import httpStatus from "http-status";
 import crypto from "crypto";
-import { PasswordResetToken } from "../models/passwordReset.model.js";
-import { sendPasswordResetEmail } from "../utils/email.js";
+import { sendPasswordResetEmail, sendGoogleLoginReminderEmail } from "../utils/email.js";
 import { User, USER_ROLE } from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
 import { Kyc } from "../models/kyc.model.js";
@@ -225,15 +224,25 @@ export const requestPasswordReset = async (email) => {
     return; // silently ignore
   }
 
+  // Check if user is a Google-only user (no password)
+  if (!user.password && user.googleId) {
+    console.log(`[DEV] User ${email} is Google-only. Sending reminder.`);
+    await sendGoogleLoginReminderEmail(user);
+    return;
+  }
+
+
+
   // Invalidate previous tokens for this user (optional but cleaner)
   await PasswordResetToken.updateMany(
     { user: user._id, used: false, expiresAt: { $gt: new Date() } },
     { used: true }
   );
 
-  // Generate random token
-  const token = crypto.randomBytes(32).toString("hex");
+  // Generate 6-digit OTP
+  const token = crypto.randomInt(100000, 999999).toString();
 
+  // Hash it for storage (same as before)
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
@@ -245,7 +254,10 @@ export const requestPasswordReset = async (email) => {
     used: false,
   });
 
-  // Send email with plain token
+  // Log for development since we don't have real email
+  console.log(`[DEV] Password Reset OTP for ${email}: ${token}`);
+
+  // Send email with OTP
   await sendPasswordResetEmail(user, token);
 };
 
@@ -290,6 +302,34 @@ export const resetPasswordWithToken = async (token, newPassword) => {
 // console.log("Fetched user:", sanitizeUser(user));
 //   return sanitizeUser(user);
 // };
+
+
+
+export const changePassword = async (userId, oldPassword, newPassword) => {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  // Google-only user check
+  if (!user.password) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "You are logged in with Google. You cannot change your password here."
+    );
+  }
+
+  const isMatch = await bcrypt.compare(oldPassword, user.password);
+  if (!isMatch) {
+    throw new ApiError(httpStatus.UNAUTHORIZED, "Incorrect old password");
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  user.password = hashedPassword;
+  await user.save();
+
+  return user;
+};
 
 export const getCurrentUser = async (userId) => {
   const user = await User.findById(userId);

@@ -47,6 +47,9 @@ router.post(
   validate(resetPasswordSchema),
   authController.resetPassword
 );
+
+router.post("/change-password", authenticate, authController.changePassword);
+
 router.post("/logout", authenticate, authController.logout);
 router.get("/me", authenticate, authController.getMe);
 

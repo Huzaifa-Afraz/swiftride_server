@@ -117,47 +117,33 @@ export const sendKycStatusEmail = async ({ user, kyc, status, reason }) => {
 export const sendPasswordResetEmail = async (user, token) => {
   if (!user || !user.email) return;
 
-  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-
-  const resetLink = `${frontendUrl}/reset-password?token=${encodeURIComponent(
-    token
-  )}`;
-
   const subject = "Reset your SwiftRide password";
 
   const html = `
-    <div style="font-family: Arial, sans-serif; color:#222;">
+    <div style="font-family: Arial, sans-serif; color:#222; max-width: 600px; margin: 0 auto;">
       <h2>Reset your password</h2>
 
       <p>Dear ${user.fullName || "SwiftRide user"},</p>
 
       <p>We received a request to reset the password for your SwiftRide account.</p>
 
-      <p>
-        Click the button below (or use the link) to set a new password. This link
-        will be valid for <strong>1 hour</strong>.
-      </p>
+      <p>Use the following code to reset your password. This code is valid for <strong>1 hour</strong>.</p>
 
-      <p style="margin:20px 0;">
-        <a href="${resetLink}" style="background:#2563eb;color:#fff;padding:10px 18px;border-radius:4px;text-decoration:none;">
-          Reset Password
-        </a>
-      </p>
+      <div style="margin: 24px 0; text-align: center;">
+        <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #2563eb; background: #f0fdf4; padding: 12px 24px; border-radius: 8px; border: 1px dashed #2563eb;">
+          ${token}
+        </span>
+      </div>
 
-      <p>Or copy this link into your browser:</p>
-      <p style="word-break:break-all; font-size:13px; color:#555;">${resetLink}</p>
+      <p>Enter this code in the app to proceed.</p>
 
-      <p style="margin-top:16px;">
+      <p style="margin-top:24px; font-size:12px; color:#888;">
         If you did not request a password reset, you can safely ignore this email.
       </p>
 
       <p style="margin-top:24px;">
         Regards,<br/>
         <strong>SwiftRide Team</strong>
-      </p>
-
-      <p style="margin-top:24px; font-size:12px; color:#888;">
-        This is an automated message, please do not reply.
       </p>
     </div>
   `;
@@ -207,4 +193,42 @@ export const sendBookingInvoiceEmail = async (
       }
     ]
   });
+};
+
+/**
+ * USER NOTIFICATION - Google Login Reminder (No Password)
+ */
+export const sendGoogleLoginReminderEmail = async (user) => {
+  if (!user || !user.email) return;
+
+  const subject = "Reset Password - Google Account";
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; color:#222; max-width: 600px; margin: 0 auto;">
+      <h2>Log in with Google</h2>
+
+      <p>Dear ${user.fullName || "SwiftRide user"},</p>
+
+      <p>We received a request to reset the password for your SwiftRide account.</p>
+
+      <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 20px 0;">
+        <p style="margin: 0; color: #334155;">
+          <strong>Note:</strong> Your account is linked to your <strong>Google Account</strong>. You don't have a separate password to reset.
+        </p>
+      </div>
+
+      <p>Please log in using the <strong>"Continue with Google"</strong> button in the app.</p>
+
+      <p style="margin-top:24px; font-size:12px; color:#888;">
+        If you are having trouble, please contact support.
+      </p>
+
+      <p style="margin-top:24px;">
+        Regards,<br/>
+        <strong>SwiftRide Team</strong>
+      </p>
+    </div>
+  `;
+
+  await sendEmail({ to: user.email, subject, html });
 };

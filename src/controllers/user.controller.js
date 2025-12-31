@@ -50,3 +50,22 @@ export const updateProfilePicture = catchAsync(async (req, res) => {
     profilePicture: user.profilePicture,
   });
 });
+
+export const updateProfile = catchAsync(async (req, res) => {
+  const { fullName, phoneNumber } = req.body;
+  const userId = req.user.id; // from authenticate middleware
+
+  const updates = {};
+  if (fullName) updates.fullName = fullName;
+  if (phoneNumber) updates.phoneNumber = phoneNumber;
+
+  const user = await User.findByIdAndUpdate(userId, updates, { new: true });
+
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  sendSuccessResponse(res, httpStatus.OK, "Profile updated successfully", {
+    user,
+  });
+});

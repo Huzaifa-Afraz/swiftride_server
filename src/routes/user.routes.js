@@ -12,4 +12,6 @@ router.put(
   userController.updateProfilePicture
 );
 
+router.patch("/profile", authenticate, userController.updateProfile);
+
 export default router;
