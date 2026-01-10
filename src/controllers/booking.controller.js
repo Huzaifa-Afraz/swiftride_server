@@ -246,7 +246,11 @@ export const downloadInvoice = catchAsync(async (req, res) => {
 
   // Check if it's a Cloudinary URL (or any remote URL)
   if (booking.pdfPath.startsWith("http")) {
-    return res.redirect(booking.pdfPath);
+        return res.json({
+       data: {
+          url: booking.pdfPath
+       }
+    });
   }
 
   // Fallback for local files (legacy support)
@@ -264,6 +268,12 @@ export const getBookingDetailForUser = catchAsync(async (req, res) => {
     .populate("car", "make model year photos location color plateNumber")
     .populate("customer", "fullName email")
     .populate("owner", "fullName email");
+  // Lazy Generation of Secret for Legacy Bookings
+  if (booking && !booking.handoverSecret && (booking.status === 'confirmed' || booking.status === 'ongoing')) {
+      const { randomBytes } = await import('crypto');
+      booking.handoverSecret = randomBytes(32).toString('hex');
+      await booking.save();
+  }
 
   if (!booking) {
     throw new ApiError(httpStatus.NOT_FOUND, "Booking not found");

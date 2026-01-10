@@ -1,17 +1,22 @@
 import { Review } from "../models/review.model.js";
 import { Booking } from "../models/booking.model.js";
 import { Car } from "../models/car.model.js";
+import mongoose from "mongoose";
 
 // Add a review
 export const addReview = async (req, res, next) => {
   try {
     const { bookingId, rating, comment } = req.body;
     const reviewerId = req.user._id;
+    console.log("Booking ID:", bookingId);
+    console.log("Reviewer ID:", reviewerId);
+    console.log("Rating:", rating);
+    console.log("Comment:", comment);
 
     // 1. Verify Booking exists and belongs to user
     const booking = await Booking.findOne({
       _id: bookingId,
-      user: reviewerId,
+      customer: reviewerId,
       status: "completed" // Can only review completed bookings
     });
 
@@ -76,6 +81,19 @@ export const getCarReviews = async (req, res, next) => {
       averageRating,
       totalReviews
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get reviews by the current user
+export const getUserReviews = async (req, res, next) => {
+  try {
+    const reviews = await Review.find({ reviewer: req.user._id })
+      .populate("car", "make model year primaryPhoto") // Show car info
+      .sort({ createdAt: -1 });
+
+    res.json(reviews);
   } catch (error) {
     next(error);
   }

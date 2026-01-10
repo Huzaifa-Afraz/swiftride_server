@@ -80,7 +80,7 @@ export const generateInvoicePDF = (booking, car, customer, owner) => {
         .fontSize(10)
         .fillColor("#555555")
         .text(brandAddress, 150, 75)
-        .text(`Phone: ${brandPhone}`, 150, 90);
+        .text(`Phone: ${brandPhone}`, 150, 90)
 
       // ===============================================
       // 5. PAID STAMP (Professional)
