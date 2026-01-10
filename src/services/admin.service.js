@@ -37,20 +37,19 @@ export const getDashboardStats = async () => {
   const availableCount = Math.max(totalCars - bookedCount, 0);
 
   // Bookings by status
-  const [pendingBookings, confirmedBookings, completedBookings, cancelledBookings] =
+  const [pendingBookings, confirmedBookings, ongoingBookings, completedBookings, cancelledBookings] =
     await Promise.all([
       Booking.countDocuments({ status: "pending" }),
       Booking.countDocuments({ status: "confirmed" }),
-      Booking.countDocuments({ status: "ongoing" }), // you may want to merge ongoing into confirmed or completed in charts
+      Booking.countDocuments({ status: "ongoing" }), 
       Booking.countDocuments({ status: "completed" }),
-      // NOTE: if you want EXACT mapping to expected output,
-      // you can decide how to aggregate "ongoing" (e.g., add it to confirmed)
+      Booking.countDocuments({ status: "cancelled" }),
     ]);
 
   // For chart simplification: treat "ongoing" as "confirmed"
   const bookingsStats = {
     pending: pendingBookings,
-    confirmed: confirmedBookings + completedBookings === 0 ? 0 : confirmedBookings, // adjust as per your business logic
+    confirmed: confirmedBookings + ongoingBookings, 
     completed: completedBookings,
     cancelled: cancelledBookings,
   };
@@ -61,7 +60,7 @@ export const getDashboardStats = async () => {
     {
       $group: {
         _id: null,
-        totalPlatformFee: { $sum: "$platformFee" }, // make sure Booking has "platformFee" field
+        totalPlatformFee: { $sum: "$platformCommissionAmount" }, 
       },
     },
   ]);

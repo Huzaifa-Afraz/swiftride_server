@@ -2,6 +2,11 @@ import { Wallet } from "../models/wallet.model.js";
 import { WalletTransaction } from "../models/walletTransaction.model.js";
 import { Booking } from "../models/booking.model.js";
 
+import { WithdrawalRequest } from "../models/withdrawalRequest.model.js";
+import ApiError from "../utils/ApiError.js";
+import httpStatus from "http-status";
+
+
 const COMMISSION_PERCENT = Number(
   process.env.WALLET_PLATFORM_COMMISSION_PERCENT || 10
 );
@@ -95,4 +100,127 @@ export const getTransactionsForUser = async (userId, limit = 50) => {
     .populate("booking", "invoiceNumber status totalPrice");
 
   return txs;
+};
+
+// --- WITHDRAWAL LOGIC ---
+export const requestWithdrawal = async (userId, amount, bankDetails) => {
+  const wallet = await getOrCreateWallet(userId);
+
+  if (wallet.balanceAvailable < amount) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Insufficient available balance");
+  }
+
+  // Deduct immediately (hold funds)
+  wallet.balanceAvailable -= amount;
+  await wallet.save();
+
+  // Create Transaction Record (Processing)
+  const transaction = await WalletTransaction.create({
+    user: userId,
+    type: "withdrawal",
+    status: "processing",
+    amount: amount,
+    description: `Withdrawal request to ${bankDetails.bankName} (${bankDetails.accountNumber})`,
+    balanceAfterAvailable: wallet.balanceAvailable,
+    balanceAfterPending: wallet.balancePending
+  });
+
+  // Create Request Record
+  const request = await WithdrawalRequest.create({
+    user: userId,
+    amount,
+    bankDetails,
+    status: "pending",
+    transaction: transaction._id
+  });
+
+  return request;
+};
+
+export const getWithdrawalRequests = async (filter = {}) => {
+  const requests = await WithdrawalRequest.find(filter)
+    .populate("user", "fullName email")
+    .sort({ createdAt: -1 });
+
+  // Enrich with User Stats
+  const enrichedRequests = await Promise.all(requests.map(async (req) => {
+    if (!req.user) return req.toObject();
+
+    const wallet = await Wallet.findOne({ user: req.user._id });
+    
+    // Count bookings with pending payments (earning + pending)
+    const pendingBookingsCount = await WalletTransaction.countDocuments({
+        user: req.user._id,
+        type: "earning",
+        status: "pending"
+    });
+
+    return {
+        ...req.toObject(),
+        userStats: {
+            balanceAvailable: wallet ? wallet.balanceAvailable : 0,
+            balancePending: wallet ? wallet.balancePending : 0,
+            pendingBookingsCount
+        }
+    };
+  }));
+
+  return enrichedRequests;
+};
+
+import { uploadToCloudinary } from "../utils/cloudinary.js";
+
+export const approveWithdrawal = async (requestId, adminNote, proofFile) => {
+  const request = await WithdrawalRequest.findById(requestId).populate("transaction");
+  if (!request) throw new ApiError(httpStatus.NOT_FOUND, "Request not found");
+  if (request.status !== "pending") throw new ApiError(httpStatus.BAD_REQUEST, "Request already processed");
+
+  // Upload Proof (if provided)
+  if (proofFile) {
+     const uploadRes = await uploadToCloudinary(proofFile.buffer);
+     request.proofImage = uploadRes.secure_url;
+     request.proofDate = new Date();
+  }
+
+  request.status = "approved";
+  request.adminNote = adminNote;
+  await request.save();
+
+  if (request.transaction) {
+    const tx = await WalletTransaction.findById(request.transaction._id);
+    if (tx) {
+        tx.status = "paid_out";
+        await tx.save();
+    }
+  }
+
+  return request;
+};
+
+export const rejectWithdrawal = async (requestId, adminNote) => {
+  const request = await WithdrawalRequest.findById(requestId);
+  if (!request) throw new ApiError(httpStatus.NOT_FOUND, "Request not found");
+  if (request.status !== "pending") throw new ApiError(httpStatus.BAD_REQUEST, "Request already processed");
+
+  const wallet = await getOrCreateWallet(request.user);
+
+  // Refund the held amount
+  wallet.balanceAvailable += request.amount;
+  await wallet.save();
+
+  // Update Request
+  request.status = "rejected";
+  request.adminNote = adminNote;
+  await request.save();
+
+  // Update Transaction to Declined
+  if (request.transaction) {
+     await WalletTransaction.findByIdAndUpdate(request.transaction, {
+         status: "declined",
+         description: `Withdrawal declined: ${adminNote}`,
+         balanceAfterAvailable: wallet.balanceAvailable
+     });
+  }
+
+  return request;
 };

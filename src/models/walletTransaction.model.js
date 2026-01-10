@@ -13,12 +13,12 @@ const walletTransactionSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["earning", "payout", "adjustment"],
+      enum: ["earning", "payout", "adjustment", "withdrawal"],
       required: true
     },
     status: {
       type: String,
-      enum: ["pending", "available", "paid_out"],
+      enum: ["pending", "available", "paid_out", "processing", "declined"],
       default: "pending"
     },
     amount: {
