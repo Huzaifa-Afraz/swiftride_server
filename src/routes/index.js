@@ -8,9 +8,27 @@ import paymentRoutes from "./payment.routes.js";
 import walletRoutes from "./wallet.routes.js";
 import hostRoutes from "./host.routes.js";
 import reviewRoutes from "./review.routes.js";
+import aiRoutes from "./ai.routes.js";
+import userRoutes from "./user.routes.js";
+import handoverRoutes from "./handover.routes.js";
+import analyticsRoutes from "./analytics.routes.js";
+
+
+const router = express.Router();
+
+router.use("/auth", authRoutes);
+router.use("/kyc", kycRoutes);
+router.use("/admin", adminRoutes);
+router.use("/cars", carRoutes);
+router.use("/bookings", bookingRoutes);
+router.use("/payments", paymentRoutes);
+router.use("/wallets", walletRoutes);
+router.use("/hosts", hostRoutes);
 router.use("/reviews", reviewRoutes);
 // router.use("/chat", chatRoutes); // Removed
 router.use("/users", userRoutes); // /api/users
 router.use("/handover", handoverRoutes); // /api/handover
 router.use("/analytics", analyticsRoutes); // /api/analytics
+router.use("/ai", aiRoutes); // /api/ai
+
 export default router;
