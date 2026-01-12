@@ -34,14 +34,16 @@ export const sanitizeUser = (userDoc) => {
   };
 };
 
-export const generateAuthToken = (user) => {
+export const generateAuthToken = (user, platform = 'web') => {
   const payload = {
     sub: user._id,
     role: user.role,
   };
 
+  const expiresIn = platform === 'mobile' ? (process.env.JWT_MOBILE_EXPIRES_IN || '365d') : (process.env.JWT_EXPIRES_IN || '7d');
+
   const token = jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || "7d",
+    expiresIn,
   });
 
   return { accessToken: token };
@@ -53,6 +55,7 @@ export const signupUser = async ({
   phoneNumber,
   password,
   role,
+  platform = 'web'
 }) => {
   if (
     !role ||
@@ -76,7 +79,10 @@ export const signupUser = async ({
     role,
   });
 
-  return sanitizeUser(user);
+  // Generate token for immediate login
+  const tokens = generateAuthToken(user, role === 'host' || role === 'customer' ? 'mobile' : 'web'); // Defaulting, but better to pass platform
+
+  return { user: sanitizeUser(user), tokens };
 };
 
 // export const loginUser = async (email, password) => {
@@ -95,8 +101,8 @@ export const signupUser = async ({
 //   return { user: sanitizeUser(user), tokens };
 // };
 
-export const loginUser = async (email, password) => {
-  console.log("Attempting login for email:", email, password);
+export const loginUser = async (email, password, platform = 'web') => {
+  console.log("Attempting login for email:", email, password, "Platform:", platform);
   // Same login for ALL roles
   const user = await User.findOne({ email });
 
@@ -109,7 +115,7 @@ export const loginUser = async (email, password) => {
     throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid credentials");
   }
 
-  const tokens = generateAuthToken(user);
+  const tokens = generateAuthToken(user, platform);
   console.log(
     "Login successful for user:",
     user._id,
@@ -136,7 +142,8 @@ export const signupShowroom = async ({ showroomName, email, password }) => {
     role: USER_ROLE.SHOWROOM,
   });
 
-  return sanitizeUser(showroomUser);
+  const tokens = generateAuthToken(showroomUser, 'web');
+  return { user: sanitizeUser(showroomUser), tokens };
 };
 
 export const loginShowroom = async (email, password) => {
@@ -155,7 +162,7 @@ export const loginShowroom = async (email, password) => {
   return { user: sanitizeUser(showroomUser), tokens };
 };
 
-export const googleLogin = async ({ idToken, role, showroomName, accessToken }) => {
+export const googleLogin = async ({ idToken, role, showroomName, platform = 'web' }) => {
   if (!idToken) {
     throw new ApiError(httpStatus.BAD_REQUEST, "idToken is required");
   }
@@ -192,7 +199,7 @@ export const googleLogin = async ({ idToken, role, showroomName, accessToken }) 
       email,
       role,
       googleId,
-      profilePicture: profilePicture, 
+      profilePicture: payload.picture,
       isEmailVerified: true,
       isVerified: false,
       isKycApproved: false,
@@ -206,19 +213,19 @@ export const googleLogin = async ({ idToken, role, showroomName, accessToken }) 
     }
     // Sync Profile Picture if missing
     if (!user.profilePicture && payload.picture) {
-        user.profilePicture = payload.picture;
-        updates = true;
+      user.profilePicture = payload.picture;
+      updates = true;
     }
     // Sync Full Name if missing (and not a showroom)
     if (!user.fullName && payload.name && user.role !== USER_ROLE.SHOWROOM) {
-        user.fullName = payload.name;
-        updates = true;
+      user.fullName = payload.name;
+      updates = true;
     }
-    
+
     if (updates) await user.save();
   }
 
-  const tokens = generateAuthToken(user);
+  const tokens = generateAuthToken(user, platform);
 
   return { user: sanitizeUser(user), tokens };
 };

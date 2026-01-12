@@ -12,7 +12,7 @@ import {
 } from "../services/auth.service.js";
 
 export const signupUser = catchAsync(async (req, res) => {
-  const { fullName, email, phoneNumber, password, role } = req.body;
+  const { fullName, email, phoneNumber, password, role, platform } = req.body;
 
   const result = await authService.signupUser({
     fullName,
@@ -20,6 +20,7 @@ export const signupUser = catchAsync(async (req, res) => {
     phoneNumber,
     password,
     role,
+    platform,
   });
 
   // Fire-and-forget admin email (do not break signup if email fails)
@@ -38,15 +39,15 @@ export const signupUser = catchAsync(async (req, res) => {
 });
 
 export const loginUser = catchAsync(async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, platform } = req.body;
   console.log("Login attempt for email:", email);
 
-  const result = await authService.loginUser(email, password);
+  const result = await authService.loginUser(email, password, platform);
   console.log("Setting cookie for user:", result.user._id);
   console.log("Token:", result.token);
   res.cookie("token", result.token, {
     httpOnly: true,
-    secure: true, 
+    secure: true,
     sameSite: "none",
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: "/",
@@ -59,12 +60,13 @@ export const loginUser = catchAsync(async (req, res) => {
 });
 
 export const signupShowroom = catchAsync(async (req, res) => {
-  const { showroomName, email, password } = req.body;
+  const { showroomName, email, password, platform } = req.body;
 
   const result = await authService.signupShowroom({
     showroomName,
     email,
     password,
+    platform,
   });
 
   (async () => {
