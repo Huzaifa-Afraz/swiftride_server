@@ -3,16 +3,13 @@ import axios from "axios";
 // This comes from your Firebase/Google Console configuration
 const EXPECTED_AUDIENCE = "400619671340-ndjjdcr3fs8bsalutjb9ldqs1egma49v.apps.googleusercontent.com";
 
-const verifyGoogleToken = async (idToken) => {
+export const verifyGoogleToken = async (idToken) => {
   try {
-    // Verify valid token via Google's public endpoint
-    console.log("Verifying ID Token with Google...");
     const response = await axios.get(
       `https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`
     );
 
     const payload = response.data;
-    console.log("Token Payload Audience:", payload.aud);
 
     // Verify Audience
     if (payload.aud !== EXPECTED_AUDIENCE) {
@@ -27,4 +24,30 @@ const verifyGoogleToken = async (idToken) => {
   }
 };
 
-export default verifyGoogleToken;
+
+export const getGoogleProfile = async (accessToken) => {
+  try {
+    
+    // Call Google's UserInfo Endpoint
+    const response = await axios.get("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`, // Use the access token here
+      },
+    });
+
+    // This will return the FULL profile (Name, Picture, Email)
+    const userData = response.data;
+    return {
+      name: userData.name,
+      email: userData.email,
+      picture: userData.picture, // High quality image URL
+      googleId: userData.sub
+    };
+
+  } catch (error) {
+    console.error("Google Profile Fetch Failed:", error.response?.data || error.message);
+    throw new Error("Invalid Google Access Token");
+  }
+};
+
+// export function getGoogleProfile;

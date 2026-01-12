@@ -6,7 +6,7 @@ import { sendPasswordResetEmail, sendGoogleLoginReminderEmail } from "../utils/e
 import { User, USER_ROLE } from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
 import { Kyc } from "../models/kyc.model.js";
-import verifyGoogleToken from "../helpers/googleAuth.helper.js";
+import {verifyGoogleToken, getGoogleProfile} from "../helpers/googleAuth.helper.js";
 
 // const sanitizeUser = (user) => {
 //   const obj = user.toObject();
@@ -155,17 +155,24 @@ export const loginShowroom = async (email, password) => {
   return { user: sanitizeUser(showroomUser), tokens };
 };
 
-export const googleLogin = async ({ idToken, role, showroomName }) => {
+export const googleLogin = async ({ idToken, role, showroomName, accessToken }) => {
   if (!idToken) {
     throw new ApiError(httpStatus.BAD_REQUEST, "idToken is required");
   }
+  if(!accessToken) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "accessToken is required");
+  }
 
   const payload = await verifyGoogleToken(idToken);
-  const email = payload.email;
-  const googleId = payload.sub;
-  const fullName = payload.name;
-
+  const profile = await getGoogleProfile(accessToken);
+  console.log("Google Profile:", JSON.stringify(profile, null, 2));
   console.log("Google Payload:", JSON.stringify(payload, null, 2));
+  const email = payload.email;
+  const googleId = profile.googleId;
+  const fullName = profile.name;
+  const profilePicture = profile.picture;
+
+  // console.log("Google Payload:", JSON.stringify(payload, null, 2));
 
   let user = await User.findOne({ email });
 
@@ -185,7 +192,7 @@ export const googleLogin = async ({ idToken, role, showroomName }) => {
       email,
       role,
       googleId,
-      profilePicture: payload.picture, 
+      profilePicture: profilePicture, 
       isEmailVerified: true,
       isVerified: false,
       isKycApproved: false,
