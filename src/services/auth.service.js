@@ -162,7 +162,7 @@ export const loginShowroom = async (email, password) => {
   return { user: sanitizeUser(showroomUser), tokens };
 };
 
-export const googleLogin = async ({ idToken, role, showroomName, platform = 'web' }) => {
+export const googleLogin = async ({ idToken, role, showroomName, platform = 'web', accessToken }) => {
   if (!idToken) {
     throw new ApiError(httpStatus.BAD_REQUEST, "idToken is required");
   }
@@ -199,7 +199,7 @@ export const googleLogin = async ({ idToken, role, showroomName, platform = 'web
       email,
       role,
       googleId,
-      profilePicture: payload.picture,
+      profilePicture: profilePicture,
       isEmailVerified: true,
       isVerified: false,
       isKycApproved: false,
