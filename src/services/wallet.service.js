@@ -12,10 +12,11 @@ const COMMISSION_PERCENT = Number(
 );
 
 const getOrCreateWallet = async (userId) => {
-  let wallet = await Wallet.findOne({ user: userId });
-  if (!wallet) {
-    wallet = await Wallet.create({ user: userId });
-  }
+  const wallet = await Wallet.findOneAndUpdate(
+    { user: userId },
+    { $setOnInsert: { user: userId } },
+    { new: true, upsert: true, setDefaultsOnInsert: true }
+  );
   return wallet;
 };
 
@@ -147,21 +148,21 @@ export const getWithdrawalRequests = async (filter = {}) => {
     if (!req.user) return req.toObject();
 
     const wallet = await Wallet.findOne({ user: req.user._id });
-    
+
     // Count bookings with pending payments (earning + pending)
     const pendingBookingsCount = await WalletTransaction.countDocuments({
-        user: req.user._id,
-        type: "earning",
-        status: "pending"
+      user: req.user._id,
+      type: "earning",
+      status: "pending"
     });
 
     return {
-        ...req.toObject(),
-        userStats: {
-            balanceAvailable: wallet ? wallet.balanceAvailable : 0,
-            balancePending: wallet ? wallet.balancePending : 0,
-            pendingBookingsCount
-        }
+      ...req.toObject(),
+      userStats: {
+        balanceAvailable: wallet ? wallet.balanceAvailable : 0,
+        balancePending: wallet ? wallet.balancePending : 0,
+        pendingBookingsCount
+      }
     };
   }));
 
@@ -177,9 +178,9 @@ export const approveWithdrawal = async (requestId, adminNote, proofFile) => {
 
   // Upload Proof (if provided)
   if (proofFile) {
-     const uploadRes = await uploadToCloudinary(proofFile.buffer);
-     request.proofImage = uploadRes.secure_url;
-     request.proofDate = new Date();
+    const uploadRes = await uploadToCloudinary(proofFile.buffer);
+    request.proofImage = uploadRes.secure_url;
+    request.proofDate = new Date();
   }
 
   request.status = "approved";
@@ -189,8 +190,8 @@ export const approveWithdrawal = async (requestId, adminNote, proofFile) => {
   if (request.transaction) {
     const tx = await WalletTransaction.findById(request.transaction._id);
     if (tx) {
-        tx.status = "paid_out";
-        await tx.save();
+      tx.status = "paid_out";
+      await tx.save();
     }
   }
 
@@ -215,11 +216,11 @@ export const rejectWithdrawal = async (requestId, adminNote) => {
 
   // Update Transaction to Declined
   if (request.transaction) {
-     await WalletTransaction.findByIdAndUpdate(request.transaction, {
-         status: "declined",
-         description: `Withdrawal declined: ${adminNote}`,
-         balanceAfterAvailable: wallet.balanceAvailable
-     });
+    await WalletTransaction.findByIdAndUpdate(request.transaction, {
+      status: "declined",
+      description: `Withdrawal declined: ${adminNote}`,
+      balanceAfterAvailable: wallet.balanceAvailable
+    });
   }
 
   return request;

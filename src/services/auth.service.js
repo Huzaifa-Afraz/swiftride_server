@@ -7,6 +7,7 @@ import { User, USER_ROLE } from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
 import { Kyc } from "../models/kyc.model.js";
 import verifyGoogleToken from "../helpers/googleAuth.helper.js";
+import { PasswordResetToken } from "../models/passwordResetToken.model.js";
 
 // const sanitizeUser = (user) => {
 //   const obj = user.toObject();
