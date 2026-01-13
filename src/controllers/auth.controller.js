@@ -1,5 +1,5 @@
 import httpStatus from "http-status";
-import verifyGoogleToken from "../helpers/googleAuth.helper.js";
+// import verifyGoogleToken from "../helpers/googleAuth.helper.js";
 import * as authService from "../services/auth.service.js";
 import catchAsync from "../utils/catchAsync.js";
 import { sendSuccessResponse } from "../utils/response.js";
@@ -146,6 +146,7 @@ export const changePassword = catchAsync(async (req, res) => {
 export const googleLogin = catchAsync(async (req, res) => {
   // Pass the request body to the service
   // Service handles verification, user creation/linking, and sanitization (including KYC flags)
+  console.log("Google Login Request Body:", req.body);
   const result = await authService.googleLogin(req.body);
 
   // Set cookie for web clients
