@@ -4,7 +4,7 @@ dotenv.config();
 import http from "http";
 import app from "./app.js";
 import connectDB from "./config/db.js";
-import { initSocket } from "./socket/socket.server.js"; // adjust path if needed
+import { initSocket } from "./socket/socket.server.js"; 
 
 const PORT = process.env.PORT || 5000;
 
