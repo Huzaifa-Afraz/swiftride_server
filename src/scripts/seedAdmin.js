@@ -26,6 +26,7 @@ async function seedAdmin() {
       email,
       password: hashedPassword,
       role: USER_ROLE.ADMIN,
+      // role: ,
       isKycApproved: true
     });
 

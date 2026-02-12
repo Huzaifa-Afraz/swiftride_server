@@ -5,7 +5,7 @@ import { Booking } from "../models/booking.model.js";
 import { WithdrawalRequest } from "../models/withdrawalRequest.model.js";
 import ApiError from "../utils/ApiError.js";
 import httpStatus from "http-status";
-
+import { uploadToCloudinary } from "../utils/cloudinary.js";
 
 const COMMISSION_PERCENT = Number(
   process.env.WALLET_PLATFORM_COMMISSION_PERCENT || 10
@@ -169,7 +169,7 @@ export const getWithdrawalRequests = async (filter = {}) => {
   return enrichedRequests;
 };
 
-import { uploadToCloudinary } from "../utils/cloudinary.js";
+
 
 export const approveWithdrawal = async (requestId, adminNote, proofFile) => {
   const request = await WithdrawalRequest.findById(requestId).populate("transaction");

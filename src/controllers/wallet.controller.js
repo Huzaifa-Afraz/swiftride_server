@@ -20,7 +20,6 @@ export const getMyWallet = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const wallet = await walletService.getWalletForUser(userId);
   const transactions = await walletService.getTransactionsForUser(userId);
-
   // Include all withdrawal requests (history)
   const withdrawalRequests = await walletService.getWithdrawalRequests({ user: userId });
 
