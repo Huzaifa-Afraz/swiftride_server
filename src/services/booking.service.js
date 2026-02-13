@@ -178,6 +178,23 @@ export const createBooking = async (customerId, payload) => {
   if (car.owner.toString() === customerId)
     throw new ApiError(httpStatus.BAD_REQUEST, "You cannot book your own car");
 
+  // --- NEW: Approval & Insurance Check ---
+  if (car.approvalStatus !== "approved") {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Car is not approved for booking yet");
+  }
+
+  const bookingEnd = new Date(endDateTime);
+  if (car.insuranceDetails?.expiryDate) {
+    const expiry = new Date(car.insuranceDetails.expiryDate);
+    if (expiry < bookingEnd) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST, 
+        "Car insurance expires before the booking period ends"
+      );
+    }
+  }
+  // ---------------------------------------
+
   // const start = new Date(startDateTime);
   // const end = new Date(endDateTime);
 

@@ -72,6 +72,35 @@ const carSchema = new mongoose.Schema(
 
     features: [{ type: String }],
 
+    // --- NEW: Approval & Insurance ---
+    approvalStatus: {
+      type: String,
+      enum: ["draft", "pending", "approved", "rejected", "suspended"],
+      default: "pending"
+    },
+    
+    insuranceDetails: {
+      provider: { type: String }, // e.g., "State Life", "EFU"
+      policyNumber: { type: String },
+      startDate: { type: Date },
+      expiryDate: { type: Date },
+      type: { 
+        type: String, 
+        enum: ["Third-Party", "Comprehensive"] 
+      },
+      documentUrl: { type: String } // Cloudinary URL
+    },
+
+    rejectionReason: { type: String }, // If rejected
+    adminNotes: { type: String },      // Admin internal notes
+    
+    approvedAt: { type: Date },
+    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+
+    // --- NEW: Re-submission Limits ---
+    reviewAttempts: { type: Number, default: 0 },
+    isPermanentlyBanned: { type: Boolean, default: false },
+
     isActive: { type: Boolean, default: true }
   },
   { timestamps: true }

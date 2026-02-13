@@ -19,13 +19,46 @@ router.get(
   carController.getMyCars
 );
 
+// --- ADMIN ROUTES ---
+router.get(
+  "/admin/list/:status", // e.g., pending, approved
+  authenticate,
+  authorizeRoles("admin"),
+  carController.getCarsByStatus
+);
+
+router.patch(
+  "/admin/:carId/approve",
+  authenticate,
+  authorizeRoles("admin"),
+  carController.approveCar
+);
+
+router.patch(
+  "/admin/:carId/reject",
+  authenticate,
+  authorizeRoles("admin"),
+  carController.rejectCar
+);
+
+router.patch(
+  "/admin/:carId/suspend",
+  authenticate,
+  authorizeRoles("admin"),
+  carController.suspendCar
+);
+// --------------------
+
 // 3) Create (protected)
 router.post(
   "/",
   authenticate,
   authorizeRoles("host", "showroom"),
   requireApprovedKyc,
-  carUpload.fields([{ name: "photos", maxCount: 10 }]),
+  carUpload.fields([
+    { name: "photos", maxCount: 10 },
+    { name: "insuranceDoc", maxCount: 1 } // + Insurance
+  ]),
   carController.createCar
 );
 
@@ -36,7 +69,8 @@ router.get("/:carId", carController.getCarById);
 router.patch(
   "/:carId",
   authenticate,
-  authorizeRoles("host", "showroom"),
+  authorizeRoles("host", "showroom", "admin"), // Admin can also edit? Or just status.
+  // Admin usually just approves. But let's say owner updates.
   carController.updateCar
 );
 
@@ -44,7 +78,7 @@ router.patch(
 router.delete(
   "/:carId",
   authenticate,
-  authorizeRoles("host", "showroom"),
+  authorizeRoles("host", "showroom", "admin"),
   carController.deleteCar
 );
 

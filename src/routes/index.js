@@ -22,7 +22,7 @@ router.use("/admin", adminRoutes);
 router.use("/cars", carRoutes);
 router.use("/bookings", bookingRoutes);
 router.use("/payments", paymentRoutes);
-router.use("/wallet", walletRoutes);
+router.use("/wallets", walletRoutes);
 router.use("/host", hostRoutes);
 router.use("/reviews", reviewRoutes);
 // router.use("/chat", chatRoutes);
