@@ -246,10 +246,10 @@ export const downloadInvoice = catchAsync(async (req, res) => {
 
   // Check if it's a Cloudinary URL (or any remote URL)
   if (booking.pdfPath.startsWith("http")) {
-        return res.json({
-       data: {
-          url: booking.pdfPath
-       }
+    return res.json({
+      data: {
+        url: booking.pdfPath
+      }
     });
   }
 
@@ -270,9 +270,9 @@ export const getBookingDetailForUser = catchAsync(async (req, res) => {
     .populate("owner", "fullName email");
   // Lazy Generation of Secret for Legacy Bookings
   if (booking && !booking.handoverSecret && (booking.status === 'confirmed' || booking.status === 'ongoing')) {
-      const { randomBytes } = await import('crypto');
-      booking.handoverSecret = randomBytes(32).toString('hex');
-      await booking.save();
+    const { randomBytes } = await import('crypto');
+    booking.handoverSecret = randomBytes(32).toString('hex');
+    await booking.save();
   }
 
   if (!booking) {
@@ -348,4 +348,15 @@ export const updateLocation = catchAsync(async (req, res) => {
   }
 
   sendSuccessResponse(res, httpStatus.OK, "Location updated");
+});
+
+export const cancelBooking = catchAsync(async (req, res) => {
+  const { bookingId } = req.params;
+  const customerId = req.user.id;
+
+  const booking = await bookingService.cancelBooking(bookingId, customerId);
+
+  sendSuccessResponse(res, httpStatus.OK, "Booking cancelled successfully", {
+    booking,
+  });
 });

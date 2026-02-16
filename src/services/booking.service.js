@@ -188,7 +188,7 @@ export const createBooking = async (customerId, payload) => {
     const expiry = new Date(car.insuranceDetails.expiryDate);
     if (expiry < bookingEnd) {
       throw new ApiError(
-        httpStatus.BAD_REQUEST, 
+        httpStatus.BAD_REQUEST,
         "Car insurance expires before the booking period ends"
       );
     }
@@ -722,6 +722,31 @@ export const updateBookingLocation = async (bookingId, locationData) => {
     speed: locationData.speed || 0,
     updatedAt: locationData.updatedAt || new Date(),
   };
+
+  await booking.save();
+  return booking;
+};
+
+export const cancelBooking = async (bookingId, customerId) => {
+  const booking = await Booking.findById(bookingId).populate("car");
+  if (!booking) throw new ApiError(httpStatus.NOT_FOUND, "Booking not found");
+
+  if (booking.customer.toString() !== customerId) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "You are not allowed to cancel this booking"
+    );
+  }
+
+  if (booking.status !== "pending" && booking.status !== "confirmed") {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Cannot cancel a booking that is ongoing or completed"
+    );
+  }
+
+  booking.status = "cancelled";
+  pushStatusHistory(booking, "cancelled", customerId, "Cancelled by customer");
 
   await booking.save();
   return booking;
