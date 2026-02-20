@@ -83,6 +83,13 @@ const mapBookingDetailForUser = (booking) => {
 
   return {
     ...base,
+    customer: booking.customer ? {
+      id: booking.customer._id,
+      fullName: booking.customer.fullName,
+      email: booking.customer.email,
+      phoneNumber: booking.customer.phoneNumber,
+      profilePicture: booking.customer.profilePicture
+    } : null,
     // minimal extra for user-facing detail
     invoicePdfPath: booking.pdfPath || null,
     invoiceDownloadPath: booking._id
@@ -176,7 +183,7 @@ export const getOwnerBookings = catchAsync(async (req, res) => {
 
   const bookings = await Booking.find({ owner: ownerId })
     .populate("car", "make model year photos location")
-    .populate("customer", "fullName email")
+    .populate("customer", "fullName email phoneNumber profilePicture")
     .sort({ createdAt: -1 });
 
   const items = bookings.map((b) => ({
@@ -185,7 +192,9 @@ export const getOwnerBookings = catchAsync(async (req, res) => {
       ? {
         id: b.customer._id,
         name: b.customer.fullName,
-        email: b.customer.email
+        email: b.customer.email,
+        phoneNumber: b.customer.phoneNumber,
+        profilePicture: b.customer.profilePicture
       }
       : null
   }));
@@ -266,7 +275,7 @@ export const getBookingDetailForUser = catchAsync(async (req, res) => {
   const booking = await Booking.findById(bookingId)
     .select("+handoverSecret")
     .populate("car", "make model year photos location color plateNumber")
-    .populate("customer", "fullName email")
+    .populate("customer", "fullName email phoneNumber profilePicture")
     .populate("owner", "fullName email");
   // Lazy Generation of Secret for Legacy Bookings
   if (booking && !booking.handoverSecret && (booking.status === 'confirmed' || booking.status === 'ongoing')) {
