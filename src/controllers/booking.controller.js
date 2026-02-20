@@ -90,6 +90,9 @@ const mapBookingDetailForUser = (booking) => {
       phoneNumber: booking.customer.phoneNumber,
       profilePicture: booking.customer.profilePicture
     } : null,
+    // Add images for handover status
+    pickupImages: booking.pickupImages || [],
+    returnImages: booking.returnImages || [],
     // minimal extra for user-facing detail
     invoicePdfPath: booking.pdfPath || null,
     invoiceDownloadPath: booking._id
